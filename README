@@ -1,3 +1,6 @@
+1.2.1 (27 Feb 2005):
+  - Added a function 'mapBuffer' to Monad.Prelude
+
 1.2 (22 Feb 2005):
   - Added a type for monoids, in Monad.Monoid.  This is not specific to the 
     monad library and should be moved somewhere else.

@@ -1,5 +1,5 @@
 PROJ          = monadLib
-VERSION	      = 1.2
+VERSION	      = 1.2.1
 
 INSTALLDIR    = /usr/local/lib/$(PROJ)
 PACKAGE       = $(PROJ)

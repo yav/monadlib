@@ -46,6 +46,15 @@ class Monad m => WriterM m w | m -> w where
 class WriterM m w => TakeWriterM m w | m -> w where
   takeFrom         :: m a -> m (a,w)
 
+-- | 'mapBuffer f m' is a computation that behaves as 'm', 
+-- except that its output is modified by 'f'.  Note that 
+-- any output produced by 'f' will appear /before/ any of the output of 'm'.
+mapBuffer          :: TakeWriterM m w => (w -> m w) -> m a -> m a
+mapBuffer f m       = do ~(a,w) <- takeFrom m
+                         put =<< f w
+                         return a 
+
+
 
 -- | Monads that can manipulate state.
 class Monad m => StateM m s | m -> s where
