@@ -1,3 +1,11 @@
+1.2 (22 Feb 2005):
+  - Added a type for monoids, in Monad.Monoid.  This is not specific to the 
+    monad library and should be moved somewhere else.
+  - Changed the interface to Writer monads to be more like it used to be in mtl.
+    In 'Writer w a', the type variable 'w' is the type of the whole buffer,
+    not just the elemnets of the buffer.  We do not use the Monoid class 
+    currently available in the library, as it is too inconvenient.  Instead
+    we use the Monoid type (see the above change).
 1.1: 
   - Added a class and instances for 'BaseM'. 
      It provides an easy means to execute a computation

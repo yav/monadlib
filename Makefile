@@ -1,5 +1,5 @@
 PROJ          = monadLib
-VERSION	      = 1.1
+VERSION	      = 1.2
 
 INSTALLDIR    = /usr/local/lib/$(PROJ)
 PACKAGE       = $(PROJ)
@@ -23,7 +23,7 @@ dist: docs Examples/*.hs
 	-rm $(PROJ)
 	make clean
 	mkdir $(PROJ)
-	cp -r Makefile package.conf docs Monad Examples $(PROJ)
+	cp -r README Makefile package.conf docs Monad Examples $(PROJ)
 	tar -czvf $(SRC_DIST_NAME) $(PROJ)
 	rm -r $(PROJ)
 

@@ -44,7 +44,7 @@ class Monad m => WriterM m w | m -> w where
 
 -- | Monads that can perform output, and it is possible to gather the output of a subcomputation. 
 class WriterM m w => TakeWriterM m w | m -> w where
-  takeFrom         :: m a -> m (a,[w])
+  takeFrom         :: m a -> m (a,w)
 
 
 -- | Monads that can manipulate state.
