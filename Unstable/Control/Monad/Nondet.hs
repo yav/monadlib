@@ -13,7 +13,7 @@
 
 module Unstable.Control.Monad.Nondet (
   Nondet, 
-  runNondet, runNondets, 
+  leftMost, depthFirst, breadthFirst,
   module T, N.MonadPlus(..)
   ) where
 
@@ -24,10 +24,13 @@ import Unstable.Control.Monad.Trans as T
 -- this is simply list
 type Nondet   = N.NondetT Identity
 
-runNondet     :: Nondet a -> Maybe a
-runNondet m   = runIdentity (N.runNondet m)
+leftMost     :: Nondet a -> Maybe a
+leftMost m    = runIdentity (N.leftMost m)
 
-runNondets    :: Nondet a -> [a]
-runNondets m  = runIdentity (N.runNondets m)
+depthFirst   :: Nondet a -> [a]
+depthFirst m  = runIdentity (N.depthFirst m)
+
+breadthFirst   :: Nondet a -> [a]
+breadthFirst m  = runIdentity (N.breadthFirst m)
 
 

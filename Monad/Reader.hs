@@ -1,12 +1,17 @@
-module Monad.Reader 
-  ( Reader
-  , run
-  , get, local, localSet
-  ) where
+-- | Implements the reader (aka environment) monad.
+module Monad.Reader (Reader, runReader, module Monad.Prelude) where
 
+import Monad.Prelude
 import Control.Monad.Fix
 
+
+-- | A computation that computes a value of type /a/,
+-- and can access a context of type /r/.
 newtype Reader r a  = R (r -> a)
+
+-- | Execute the computation in the given context.
+runReader          :: r -> Reader r a -> a
+runReader r (R m)   = m r 
 
 instance Functor (Reader r) where
   fmap f (R m)      = R (\r -> f (m r))
@@ -20,17 +25,10 @@ instance MonadFix (Reader r) where
   mfix f            = R (\r -> let R n = f a
                                    a   = n r
                                in a)
-                           
-run                :: r -> Reader r a -> a
-run r (R m)         = m r 
 
-get                :: Reader r r
-get                 = R (\r -> r)
+instance ReaderM (Reader r) r where
+  get               = R (\r -> r)
+  local f (R m)     = R (\r -> m (f r))
 
-local              :: (r -> s) -> Reader s a -> Reader r a  
-local f (R m)       = R (\r -> m (f r))
-
-localSet           :: r -> Reader r a -> Reader s a
-localSet r (R m)    = R (\_ -> m r)
 
 

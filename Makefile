@@ -1,31 +1,44 @@
-INSTALLDIR = /usr/local/lib/MTL
-SRCDIR = Unstable/Control/Monad
-HSFILES	= $(SRCDIR)/*.hs $(SRCDIR)/Private/*.hs $(SRCDIR)/ST/*.hs
-PACKAGE = monads
+PROJ          = monadLib
+VERSION	      = 1.0
 
-libMTL.a: dirs utils $(HSFILES) 
-	ghc --make -fglasgow-exts -package-name $(PACKAGE) -odir dirs/obj -hidir dirs/hi $(HSFILES)
-	-rm -rf dirs/lib
-	mkdir dirs/lib
-	./utils/renameObjs dirs/obj dirs/lib
-	ar cqs libMTL.a dirs/lib/*.o
-	-rm -rf dirs/lib
+INSTALLDIR    = /usr/local/lib/$(PROJ)
+PACKAGE       = $(PROJ)
+LIB_NAME      = lib$(PROJ).a
+SRC_DIST_NAME = $(PROJ)-$(VERSION)-src.tar.gz
 
-dirs ::
-	-mkdir -p dirs/obj
-	-mkdir -p dirs/hi
+all: $(LIB_NAME) docs
 
 
-utils ::
-	(cd utils; make)
+$(LIB_NAME): Monad/*.hs
+	ghc --make -fglasgow-exts -package-name $(PACKAGE) Monad/*.hs
+	ar cqs $(LIB_NAME) Monad/*.o
 
-install: 
+docs: Monad/*.hs 
+	-rm -r docs
+	mkdir docs
+	-ln -s ../Examples docs/Examples
+	haddock -h -k $(PACKAGE) -o docs Monad/*.hs Examples/*.hs
+
+dist: docs Examples/*.hs
+	-rm $(PROJ)
+	make clean
+	mkdir $(PROJ)
+	cp -r Makefile package.conf docs Monad Examples $(PROJ)
+	tar -czvf $(SRC_DIST_NAME) $(PROJ)
+	rm -r $(PROJ)
+
+install: docs $(LIB_NAME)
 	mkdir -p $(INSTALLDIR)
-	cp libMTL.a $(INSTALLDIR)
-	cp -r dirs/hi/* $(INSTALLDIR) 
+	cp $(LIB_NAME) $(INSTALLDIR)
+	mkdir -p $(INSTALLDIR)/Monad
+	cp -r Monad/*.hi $(INSTALLDIR)/Monad 
 	installdir=$(INSTALLDIR) package=$(PACKAGE) ghc-pkg -u -g < package.conf
 
-
 clean:	
-	-rm -rf dirs
+	-rm Monad/*.o Monad/*.hi
+
+veryclean: clean
+	-rm $(LIB_NAME)
+	-rm $(SRC_DIST_NAME)
+	-rm -r docs
 

@@ -1,45 +1,108 @@
+-- | An implementation of the exception monad transformer.
+-- Adds the ability to raise and handle exceptions.
+--
+-- * Commutes with: "Monad.ExceptT"
+--
+-- * Does not commute with: "Monad.ReaderT", "Monad.WriterT", "Monad.StateT", "Monad.BackT", "Monad.ContT"
 module Monad.ExceptT 
-  ( ExceptT, Except(..)
-  , run
-  , raise, handle
+  ( -- * Instance notes
+
+    -- ** instance ReaderM
+    -- $ReaderM
+
+    -- ** instance WriterM
+    -- $WriterM
+
+    -- ** instance StateM
+    -- $StateM
+
+    -- ** instance BackM
+    -- $BackM
+
+  ExceptT, runExcept, module Monad.Prelude
   ) where
 
+import Monad.Prelude
 import Control.Monad.Fix
-import Monad.Except(Except(..))
 
-newtype ExceptT e m a  = E (m (Except e a))
+-- | A computation that computes a value of type /a/, and may raise 
+-- exceptions of type /x/, and can also side-effect as described by /m/.
+newtype ExceptT x m a = E (forall r. (a -> m r) -> (x -> m r) -> m r)
 
-instance Functor m => Functor (ExceptT e m) where
-  fmap f (E m)        = E (fmap (fmap f) m) 
-
-instance Monad m => Monad (ExceptT e m) where
-  return a          = E (return (Ok a))
-  E m1 >>= k        = E (do x <- m1
-                            case x of
-                              Fail e  -> return (Fail e)
-                              Ok a    -> let E m2 = k a 
-                                         in m2)
-
-instance MonadFix m => MonadFix (ExceptT e m) where
-  mfix f            = E (mfix (\ ~(Ok a) -> let E m = f a in m))
+-- | Execute a computation: if it succeeds the result can
+-- be found in the right component of the result (the _right_ answer :-).
+-- If the computation failed, the exception is reported
+-- in the left component of the result.
+runExcept          :: Monad m => ExceptT x m a -> m (Either x a)
+runExcept (E f)     = f (return . Right) (return . Left)
 
 
--- | Run a computation, an answer on the left indicates an error occured,
--- | an answer on the right indicates a successful execution.
-run                :: ExceptT e m a -> m (Except e a)
-run (E m)           = m
 
--- | Raise an exception.
-raise              :: Monad m => e -> ExceptT e m a
-raise e             = E (return (Fail e))
+instance Functor (ExceptT x m) where
+  fmap f (E g)      = E (\ok fail -> g (ok . f) fail)
 
--- | Handle an exception. Do nothing if no exception occurs.
-handle             :: Monad m => ExceptT e m a -> (e -> ExceptT e m a) -> ExceptT e m a
-handle (E m1) h     = E (do x <- m1
-                            case x of
-                              Fail e  -> let E m2 = h e 
-                                         in m2
-                              _       -> return x)
+instance Monad (ExceptT x m) where
+  return x          = E (\ok _ -> ok x)
+  E f >>= k         = E (\ok fail -> f (\a -> let E g = k a
+                                              in g ok fail
+                                       ) fail)
+
+instance Trans (ExceptT x) where
+  lift m            = E (\ok _ -> ok =<< m)
+
+instance MonadFix m => MonadFix (ExceptT x m) where
+  mfix f            = E (\ok fail -> mdo let E g = f a
+                                         ~(a,r) <- g (\a -> do r <- ok a
+                                                               return (a,r)
+                                                     ) 
+                                                     (\x -> do r <- fail x
+                                                               return (error "mfix looped",r)
+                                                     )
+                                         return r)
 
 
+-- $ReaderM
+-- Exceptions are handled in the context in which the exception was risen.
+--
+-- see: runReaderIn in <Examples/Except.hs>
+instance ReaderM m r => ReaderM (ExceptT x m) r where
+  get               = lift get
+  local f (E m)     = E (\ok fail -> local f (m ok fail))
+
+
+-- $WriterM
+-- Raising an exception does not affect the output.
+--
+-- see: runWriterIn <Examples/Except.hs>
+instance WriterM m o => WriterM (ExceptT x m) o where
+  put o             = lift (put o)
+
+
+
+-- $StateM
+-- Raising an exception does not affect the state.
+--
+-- see: runStateIn in <Examples/Except.hs>
+instance StateM m s => StateM (ExceptT x m) s where
+  peek              = lift peek
+  poke s            = lift (poke s)
+
+instance ExceptM (ExceptT x m) x where
+  raise x           = E (\_ fail -> fail x)
+  handle (E f) h    = E (\ok fail -> f ok (\x -> let E g = h x
+                                                 in g ok fail))
+
+
+-- $BackM
+-- Raising an exception in one alternative does not prevent other alternatives form executing.
+--
+-- see: runBackExceptOut in <Examples/Control.hs>
+instance MonadPlus m => MonadPlus (ExceptT x m) where
+  mzero             = E (\_ _ -> mzero)
+  mplus (E f) (E g) = E (\ok fail -> f ok fail `mplus` g ok fail)
+
+
+
+
+                    
 
