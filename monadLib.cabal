@@ -1,0 +1,18 @@
+Name:           monadLib
+Version:        1.2.2
+License:        BSD3
+Author:         Iavor S. Diatchki
+Homepage:       http://www.cse.ogi.edu/~diacthki/monadLib
+Category:       Monads
+Build-Depends:  base
+Synopsis:       A collection of monads
+Exposed-modules:
+  Monad.BackT,   Monad.ExceptT,  Monad.Reader,   Monad.Writer,
+  Monad.Cont,    Monad.Id,       Monad.ReaderT,  Monad.WriterT,
+  Monad.ContT,   Monad.Monoid,   Monad.State,
+  Monad.Except,  Monad.Prelude,  Monad.StateT
+Extensions:     
+  RecursiveDo, MultiParamTypeClasses, FunctionalDependencies,
+  PolymorphicComponents 
+GHC-options:    -O2
+
