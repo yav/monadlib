@@ -40,7 +40,6 @@ module Unstable.Control.Monad.WriterT (
 
           ) where
 
-import Prelude(Functor(..),Monad(..),fst,snd,(.))
 import Data.Monoid as Monoid (Monoid(..))
 import Control.Monad(liftM,MonadPlus(..))
 import Control.Monad.Fix

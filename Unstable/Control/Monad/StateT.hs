@@ -35,7 +35,6 @@ module Unstable.Control.Monad.StateT (
 
   ) where
 
-import Prelude (Functor(..),Monad(..),(.),fst,snd,flip)
 import Control.Monad(liftM,MonadPlus(..))
 import Control.Monad.Fix
 

@@ -35,7 +35,6 @@ module Unstable.Control.Monad.ErrorT (
 	module T
   ) where
 
-import Prelude(Functor(..),Monad(..),Either(..),either,(.),id,error)
 import Control.Monad(MonadPlus(..),liftM)
 import Control.Monad.Fix
 
@@ -66,6 +65,7 @@ instance (Monad m) => Monad (ErrorT e m) where
 
 instance MonadFix m => MonadFix (ErrorT e m) where
   mfix f  = E (mfix (unE . f . either (error "ErrorT: mfix looped") id))
+
 
 --------------------------------------------------------------------------------
 
@@ -136,6 +136,5 @@ instance MonadResume m => MonadResume (ErrorT e m) where
 
 instance (MonadCont m) => MonadCont (ErrorT e m) where
   callCC            = callCC1' E unE Right
-
 
 

@@ -26,7 +26,6 @@ module Unstable.Control.Monad.NondetT (
   module T
   ) where
 
-import Prelude hiding (map)
 import Monad(liftM,MonadPlus(..))
 import Control.Monad.Fix
 import Data.Maybe(listToMaybe)
@@ -89,8 +88,8 @@ runNondet           = liftM listToMaybe . runNondets
 runNondets          :: Monad m => NondetT m a -> m [a]
 runNondets m        = flatten =<< unN m 
 
-map                 :: Monad m => (m (T m a) -> n (T n b)) -> NondetT m a -> NondetT n b
-map f (N m)         = N (f m)
+mapN                :: Monad m => (m (T m a) -> n (T n b)) -> NondetT m a -> NondetT n b
+mapN f (N m)        = N (f m)
 
 
 -- private:
@@ -117,7 +116,7 @@ flatten (Cons a m)  = liftM (a :) (runNondets m)
 
 instance MonadReader r m => MonadReader r (NondetT m) where
   ask               = ask'
-  local             = local' map
+  local             = local' mapN
 
 instance MonadWriter w m => MonadWriter w (NondetT m) where
   tell              = tell'

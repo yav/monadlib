@@ -3,7 +3,6 @@
 module Unstable.Control.Monad.ResumeT 
   (ResumeT, runResume, foldResume, module T) where
 
-import Prelude(Functor(..),Monad(..),error,id,(.))
 import Control.Monad(liftM,MonadPlus(..))
 
 import Unstable.Control.Monad.Trans as T
@@ -60,15 +59,15 @@ runResume   = foldResume return id
 
 
 -- private
-map         :: (m (Res m a) -> n (Res n b)) -> ResumeT m a -> ResumeT n b
-map f       = Re . f . unRe 
+mapR        :: (m (Res m a) -> n (Res n b)) -> ResumeT m a -> ResumeT n b
+mapR f      = Re . f . unRe 
 
 --------------------------------------------------------------------------------
 
 
 instance MonadReader r m => MonadReader r (ResumeT m) where
   ask       = ask'
-  local     = local' map
+  local     = local' mapR
 
 instance MonadWriter w m => MonadWriter w (ResumeT m) where
   tell      = tell'
@@ -88,7 +87,7 @@ instance MonadPlus m => MonadPlus (ResumeT m) where
 
 instance MonadNondet m => MonadNondet (ResumeT m) where
   findAll   = error "findAll ResumeT TODO"
-  commit    = map commit
+  commit    = mapR commit
 
 instance Monad m => MonadResume (ResumeT m) where
   delay m   = Re (return (Delay m))

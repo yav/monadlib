@@ -198,6 +198,8 @@ class (Monad m) => MonadState s m | m -> s where
   put         :: s -> m ()
   -- ^ @put s@ permanently changes the value of the variable to @s@.
 
+
+
 -- $MonadStateDoc
 -- 
 

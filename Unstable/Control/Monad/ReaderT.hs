@@ -29,7 +29,6 @@ module Unstable.Control.Monad.ReaderT (
 	module T
 	) where
 
-import Prelude (Monad(..),Functor(..),const,(.))
 import Control.Monad (MonadPlus(..),liftM)
 import Control.Monad.Fix
 

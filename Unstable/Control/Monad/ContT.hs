@@ -29,7 +29,6 @@ module Unstable.Control.Monad.ContT (
 	module T
   ) where
 
--- import Prelude (Functor(..),Monad(..),(.),error,flip)
 import Control.Monad(liftM,MonadPlus(..))
 import Control.Monad.Fix
 
