@@ -10,7 +10,7 @@ all: $(LIB_NAME) docs
 
 
 $(LIB_NAME): Monad/*.hs
-	ghc --make -fglasgow-exts -package-name $(PACKAGE) Monad/*.hs
+	ghc --make -O -fglasgow-exts -package-name $(PACKAGE) Monad/*.hs
 	ar cqs $(LIB_NAME) Monad/*.o
 
 docs: Monad/*.hs 

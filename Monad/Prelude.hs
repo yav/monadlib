@@ -104,6 +104,21 @@ partitionM p (a:as) = do b <- p a
                          (xs,ys) <- partitionM   p as
                          return (if b then (a:xs,ys) else (xs,a:ys))
 
+zipWith3M          :: Monad m => (a -> b -> c -> m d) -> [a] -> [b] -> [c] -> m [d]
+zipWith3M f [] _ _                = return []
+zipWith3M f _ [] _                = return []
+zipWith3M f _ _ []                = return []
+zipWith3M f (x:xs) (y:ys) (z:zs)  = (:) # f x y z <# zipWith3M f xs ys zs
+
+zipWith3M_         :: Monad m => (a -> b -> c -> m d) -> [a] -> [b] -> [c] -> m ()
+zipWith3M_ f [] _ _                 = return ()
+zipWith3M_ f _ [] _                 = return ()
+zipWith3M_ f _ _ []                 = return ()
+zipWith3M_ f (x:xs) (y:ys) (z:zs)   = f x y z >> zipWith3M_ f xs ys zs
+
+
+
+
 
                           
                      
