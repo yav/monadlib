@@ -61,6 +61,7 @@ mplus2' mk unmk m n = mk (\y -> unmk m y `mplus` unmk n y)
 callCC1' mk unmk ret f  = mk (callCC (\br -> unmk (f (\a -> lift (br (ret a))))))
 callCC2' mk unmk ret f  = mk (\s -> callCC (\br -> unmk (f (\a -> lift (br (ret a s)))) s))
 
-
+apFst f ~(x,y)  = (f x, y)
+apSnd f ~(x,y)  = (x,f y)
 
 

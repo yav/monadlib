@@ -62,6 +62,8 @@ instance Monad m => Functor (Res m) where
 --------------------------------------------------------------------------------
 
 -- | A general way to "execute" computations in the resumption monad.
+foldResume' done paused = step done (paused . foldResume' done paused)
+
 foldResume  :: Monad m => (a -> m b) -> (m b -> m b) -> ResumeT m a -> m b
 foldResume value delay m  
             = do x <- unRe m
@@ -69,7 +71,6 @@ foldResume value delay m
                    Value a -> value a
                    Delay m -> delay (foldResume value delay m)
 
-foldResume' done paused = step done (paused . foldResume' done paused)
 
 
 -- | Executes all computations, until a value is reached.  
@@ -104,9 +105,42 @@ instance MonadPlus m => MonadPlus (ResumeT m) where
   mzero     = mzero'
   mplus     = mplus1' Re unRe
 
+{-
 instance MonadNondet m => MonadNondet (ResumeT m) where
-  findAll   = error "findAll ResumeT TODO"
-  commit    = mapR commit
+  findAll (R m) = do cs <- findAll m
+                     mapM run cs
+    where run (Value a) = return a
+          run (Delay m) = find
+
+  -- it seems that many implementaions make sense, depth vs breadth, where to put pauses?
+  -- commit        = mapR commit
+  -- next            = mapR next
+-}
+
+findAll'          :: MonadNondet m => ResumeT m a -> m [Res m a]
+findAll' (Re m)    = findAll m
+
+
+-- breadth first, stopping at each level
+bf :: MonadNondet m => ResumeT m a -> ResumeT m [a] 
+bf m        = Re (bf' [] [m])
+  where bf' as []   = return (Value (reverse as))
+        bf' as ms   = do rss <- mapM (findAll . unRe) ms
+                         let rs = concat rss
+                             vs = [ a | Value a <- rs ]
+                             ds = [ d | Delay d <- rs ]
+                         return $ Delay $ Re $ bf' (vs ++ as) ds
+    
+{-
+df as (Re m)   = do r <- m
+                    case r of
+                      Value a -> 
+-}
+
+
+                   
+
+
 
 instance Monad m => MonadResume (ResumeT m) where
   delay m         = Re (return (Delay m))

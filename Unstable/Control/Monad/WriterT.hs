@@ -142,7 +142,8 @@ instance (Monoid w, MonadPlus m) => MonadPlus (WriterT w m) where
 instance (Monoid w, MonadNondet m) => MonadNondet (WriterT w m) where
   findAll       = mapWriterT (liftM (\xs -> (fmap fst xs, mempty)) . findAll) 
 
-  commit        = mapWriterT commit
+  -- commit        = mapWriterT commit
+  next          = mapWriterT (liftM (\ ~(~(a,w),m) -> ((a,W m),w)) . next)
 
 
 -- TODO: can we add a function that will give acess to the output as well,

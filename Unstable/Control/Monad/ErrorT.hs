@@ -128,8 +128,15 @@ instance MonadNondet m => MonadNondet (ErrorT e m) where
   findAll     = mapErrorT (liftM res . findAll)
     where res xs = Right [ x | Right x <- xs ]
 
+  -- commit      = mapErrorT commit
+  next (E m)     = E (f =<< next m)
+    where f ~(Left err,m) = f =<< next m
+          f ~(Right a,m)  = return (Right (a,E m))
 
-  commit      = mapErrorT commit
+-- finds the next computation that did not rise an exception
+-- to count computations that rose an exceptions, use nextE
+
+
 
 instance MonadResume m => MonadResume (ErrorT e m) where
   delay           = mapErrorT delay

@@ -141,8 +141,13 @@ instance MonadNondet m => MonadNondet (StateT s m) where
   If the state at the end of each alternative is needed, one can use 'findAllS'.
 -}
 
-  commit      = mapStateT commit
+  -- commit      = mapStateT commit
+  next          = mapStateT (liftM (\ ~(~(a,s),m) -> ((a,S (const m)),s)) . next)
 
+-- the abobe is somewhat weird, but seems right:  we get the first result,
+-- and its seffects on the state.  however when (of if) later we decide
+-- to execute the alternatives, the state will be rolled back.
+-- so all the alternatives will be tries in the same state 
 
 
 instance MonadResume m => MonadResume (StateT s m) where

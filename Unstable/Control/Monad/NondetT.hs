@@ -144,9 +144,15 @@ instance Monad m => MonadPlus (NondetT m) where
 
 instance Monad m => MonadNondet (NondetT m) where
   findAll m         = lift (runNondets m)
+{-
   commit (N m)      = N (liftM hd' m) 
     where hd' Empty       = Empty
           hd' (Cons a _)  = single a
+-}
+  next (N m)        = N (liftM hd m)
+    where hd Empty        = Empty
+          hd (Cons a as)  = single (a,as)
+
 
 instance MonadResume m => MonadResume (NondetT m) where
   delay (N m)           = N (delay m)

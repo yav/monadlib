@@ -34,6 +34,7 @@ module Unstable.Control.Monad.Trans
     -- ** Exceptions
     MonadError(..),
     -- $MonadErrorDoc
+    succeeds,
     throwError,
     catchError,
 
@@ -41,9 +42,11 @@ module Unstable.Control.Monad.Trans
     MonadPlus(..),
     MonadNondet(..),
     -- $MonadNondetDoc
+    commit,
     findAllW,
     findAllS,
     findAllE,
+    nextE,
 
     -- ** Resumptions
     MonadResume(..),
@@ -247,6 +250,12 @@ class (Monad m) => MonadError e m | m -> e where
 
 -- $ErrorDoc
 
+-- | Turns exceptions into results
+succeeds     :: MonadError e m => m a -> m (Either e a)
+succeeds m    = handle (liftM Right m) (return . Left)
+
+
+
 -- | For backward compatibility
 catchError  :: MonadError e m => m a -> (e -> m a) -> m a
 catchError  = handle
@@ -274,11 +283,25 @@ class (MonadPlus m) => MonadNondet m where
   -- (e.g. Prolog, Curry). It produces all possible results of @m@.
   -- Always succeeds with exactly ones resul --- the list.
 
+{-
   commit      :: m a -> m a
   -- ^ @commit m@ behaves like @m@ except it will produce at most one result.
   -- Thus, it resembles the /cut/ operator of Prolog.
   -- @findAll (commit m)@ should never produce a list with more than one element.
+-}
 
+  next        :: m a -> m (a, m a)
+  -- ^ @next m@ produces the next possible answer of a computation,
+  -- and another computation capturing the other alternatives.
+  -- It is somewhat similar to a combined @head@ and @tail@ on lists.
+  -- @next m@ has at most 1 answer.
+
+
+commit        :: MonadNondet m => m a -> m a
+commit m      = liftM fst (next m)
+-- ^ @commit m@ behaves like @m@ except it will produce at most one result.
+-- Thus, it resembles the (scoped) /cut/ operator of Prolog.
+-- @findAll (commit m)@ produces at most 1 answer.
 
 
 -- | This method is useful for computations, where a writer is added after nondeterminism.
@@ -301,7 +324,14 @@ findAllS m    = findAll (do x <- m
 -- like in 'run': Errors are injected in the left component of a sum,
 -- while successes are injected on the right.
 findAllE      :: (MonadNondet m, MonadError e m) => m a -> m [Either e a]
-findAllE m    = findAll (handle (liftM Right m) (return . Left))
+findAllE      = findAll . succeeds
+
+
+-- | This method is useful for computations, where errors are added after nondeterminism.
+-- If a programmer needs the next computation, even if it rose an exception,
+-- the can use 'nextE' instead of 'next'.
+nextE         :: (MonadNondet m, MonadError e m) => m a -> m (Either e a, m (Either e a))
+nextE         = next . succeeds
 
 
 

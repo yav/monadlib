@@ -114,7 +114,8 @@ instance MonadPlus m => MonadPlus (ReaderT r m) where
 
 instance (MonadNondet m) => MonadNondet (ReaderT r m) where
   findAll         = mapReaderT findAll
-  commit          = mapReaderT commit 
+  -- commit          = mapReaderT commit 
+  next            = mapReaderT (liftM (apSnd lift) . next)
 
 instance MonadResume m => MonadResume (ReaderT r m) where
   delay           = mapReaderT delay
