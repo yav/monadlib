@@ -23,16 +23,6 @@ type Reader r     = R.ReaderT r Identity
 runReader         :: r -> Reader r a -> a
 runReader r m     = runIdentity (R.runReader r m)
 
-{-
-newtype Reader r a  = R (R.ReaderT r Identity a) 
-                    deriving (Functor,Monad,MonadFix,MonadReader r)
-
-instance HasBaseMonad (Reader r) (Reader r) where
-  inBase            = id
-
-runReader         :: r -> Reader r a -> a
-runReader r (R m) = runIdentity (R.runReader r m)
--}
 
 
 

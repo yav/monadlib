@@ -272,6 +272,7 @@ class (MonadPlus m) => MonadNondet m where
   findAll     :: m a -> m [a]
   -- ^ @findAll m@ is analogous to the construct found in logic languages
   -- (e.g. Prolog, Curry). It produces all possible results of @m@.
+  -- Always succeeds with exactly ones resul --- the list.
 
   commit      :: m a -> m a
   -- ^ @commit m@ behaves like @m@ except it will produce at most one result.
@@ -296,7 +297,7 @@ findAllS m    = findAll (do x <- m
 
 -- | This method is useful for computations, where errors are added after nondeterminism.
 -- If a programmer needs all computations, including the ones that failed,
--- they can use 'findAllS', instead of 'findAll'.  The answers are returned
+-- they can use 'findAllE', instead of 'findAll'.  The answers are returned
 -- like in 'run': Errors are injected in the left component of a sum,
 -- while successes are injected on the right.
 findAllE      :: (MonadNondet m, MonadError e m) => m a -> m [Either e a]
@@ -308,7 +309,6 @@ findAllE m    = findAll (handle (liftM Right m) (return . Left))
 class Monad m => MonadResume m where
   delay       :: m a -> m a
   step        :: (a -> m b) -> (m a -> m b) -> m a -> m b
-
 
 
 
