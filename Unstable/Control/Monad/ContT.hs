@@ -76,8 +76,8 @@ instance (MonadState s m) => MonadState s (ContT r m) where
   put         = put'
 
 instance (MonadError e m) => MonadError e (ContT r m) where
-  throwError  = throwError'  
-  catchError  = catchError2' C ($$)
+  raise       = raise'  
+  handle      = handle2' C ($$)
 
 instance MonadPlus m => MonadPlus (ContT r m) where
   mzero       = mzero

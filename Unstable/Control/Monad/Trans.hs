@@ -31,6 +31,8 @@ module Unstable.Control.Monad.Trans
     -- ** Exceptions
     MonadError(..),
     -- $MonadErrorDoc
+    throwError,
+    catchError,
 
     -- ** Non-determinism
     MonadNondet(..),
@@ -193,17 +195,28 @@ modify f      = get >>= put . f
 -- | An error (or exception) monad is aware that computations may fail.
 -- The type @e@ specifies what errors may occur in a computation.
 class (Monad m) => MonadError e m | m -> e where
-  throwError  :: e -> m a
-  -- ^ The method @throwError e@ raises exception @e@.
+  raise :: e -> m a
+  -- ^ The method @raise e@ raises exception @e@.
   -- It never returns a value.
 
-  catchError  :: m a -> (e -> m a) -> m a
-  -- ^ The method @catchError m h@ uses the handler @h@ to handle exceptions
+  handle :: m a -> (e -> m a) -> m a
+  -- ^ The method @handle m h@ uses the handler @h@ to handle exceptions
   -- raised in computation @m@.  If no exceptions are
   -- raised, the final computation behaves as @m@.  It is possible
   -- for the handler itself to throw an exception.
 
 -- $ErrorDoc
+
+-- | For backward compatability
+catchError  :: MonadError e m => m a -> (e -> m a) -> m a
+catchError  = handle
+
+-- | For backward compatability
+throwError  :: MonadError e m => e -> m a
+throwError  = raise
+
+
+
 
 -- | A nondeterminism (or backtracking) monad supports computations that 
 -- may fail and backtrack or produce multiple results.  

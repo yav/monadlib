@@ -62,11 +62,11 @@ instance (MonadState s m) => MonadState s (ErrorT e m) where
   put       = put'
 
 instance (Monad m) => MonadError e (ErrorT e m) where
-  throwError       = E . return . Left 
-  m `catchError` h = E (do a <- unE m
-                           case a of
-                             Left  l -> unE (h l)
-                             Right r -> return (Right r))
+  raise       = E . return . Left 
+  handle m h  = E (do a <- unE m
+                      case a of
+                        Left  l -> unE (h l)
+                        Right r -> return (Right r))
 
 -- MonadPlus is used for Nondet, these should be moved in the nondet class
 instance MonadPlus m => MonadPlus (ErrorT e m) where

@@ -104,8 +104,8 @@ instance (Monad m) => MonadState s (StateT s m) where
   put s       = S (\_ -> return ((), s))
 
 instance (MonadError e m) => MonadError e (StateT s m) where
-  throwError  = throwError'
-  catchError  = catchError2' S unS
+  raise       = raise'
+  handle      = handle2' S unS
 
 instance (MonadPlus m) => MonadPlus (StateT s m) where
   mzero       = mzero'

@@ -6,3 +6,7 @@ infix 1 ===
 (===) :: a -> a -> Prop a
 (===) = error "==="
 
+
+assert :: Bool -> a
+assert = error "assert"
+

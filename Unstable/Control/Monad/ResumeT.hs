@@ -10,8 +10,7 @@ import Control.Monad(liftM,MonadPlus(..))
 import Unstable.Control.Monad.Trans as T
 import Unstable.Control.Monad.Private.Utils
 
--- resumptions:
--- a transformer for explicit "lazyness"
+-- resumptions
 
 newtype ResumeT m a   = Re { unRe :: m (Res m a) }
 data Res m a          = Value a | Delay (ResumeT m a)
@@ -60,8 +59,8 @@ instance MonadState s m => MonadState s (ResumeT m) where
   put       = put'
 
 instance MonadError e m => MonadError e (ResumeT m) where
-  throwError  = throwError'
-  catchError  = catchError1' Re unRe
+  raise     = raise'
+  handle    = handle1' Re unRe
 
 instance MonadPlus m => MonadPlus (ResumeT m) where
   mzero     = mzero'

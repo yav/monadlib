@@ -50,7 +50,10 @@ Writer: * new function runWriter (same as runWriterT)
         * moved "pass" out of the class (implemented in terms of the other functions)
 State:  * new functions runState (like evalState with swapped arguments)
                         runStateS (like runStateT with swapped arguments)
-Error:  * new function runError (same as runErrorT)
+Error:  * renamed method "throwError" to "raise"
+        * renames method "catchError" to "handle"
+        * "throwError" and "cacthError" are defined a sfunctions for compatability
+        * new function runError (same as runErrorT)
         * removed Error class, now errors can be of any type
         * fail "" does _not_ cause an error to be thrown  (see comments above)
         * mzero does _not_ cause an error to be thrown  (see comments above)

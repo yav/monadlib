@@ -9,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable (multi-param classes, functional dependencies)
 --
--- The definition of the reader monad transformer.
+-- Definition of the reader monad transformer.
 --
 --	  Inspired by the paper
 --	  /Functional Programming with Overloading and
@@ -96,8 +96,8 @@ instance MonadState s m => MonadState s (ReaderT r m) where
   put             = put'
 
 instance MonadError e m => MonadError e (ReaderT r m) where
-  throwError      = throwError'
-  catchError      = catchError2' R unR
+  raise           = raise'
+  handle          = handle2' R unR
 
 instance MonadPlus m => MonadPlus (ReaderT r m) where
   mzero           = mzero'

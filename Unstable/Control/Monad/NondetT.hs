@@ -90,8 +90,8 @@ instance MonadState s m => MonadState s (NondetT m) where
   put               = put'
 
 instance MonadError e m => MonadError e (NondetT m) where
-  throwError        = throwError'
-  catchError        = catchError1' N unN
+  raise             = raise'
+  handle            = handle1' N unN
 
 instance Monad m => MonadPlus (NondetT m) where
   mzero             = N (return Empty)

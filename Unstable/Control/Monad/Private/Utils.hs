@@ -43,9 +43,9 @@ put'      :: (MonadTrans t, MonadState s m) => s -> t m ()
 put' s    = lift (put s)
 
 -- error
-throwError' e             = lift (throwError e)
-catchError1' mk unmk m h  = mk (catchError (unmk m) (unmk . h))
-catchError2' mk unmk m h  = mk (\y -> catchError (unmk m y) (\e -> unmk (h e) y))
+raise' e              = lift (raise e)
+handle1' mk unmk m h  = mk (handle (unmk m) (unmk . h))
+handle2' mk unmk m h  = mk (\y -> handle (unmk m y) (\e -> unmk (h e) y))
 
 -- mplus
 mzero'    :: (MonadTrans t, MonadPlus m) => t m a

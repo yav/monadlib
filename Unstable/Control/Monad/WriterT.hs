@@ -87,8 +87,8 @@ instance (Monoid w, MonadState s m) => MonadState s (WriterT w m) where
   put           = put'
 
 instance (Monoid w, MonadError e m) => MonadError e (WriterT w m) where
-  throwError    = throwError'
-  catchError    = catchError1' W unW
+  raise         = raise'
+  handle        = handle1' W unW
 
 instance (Monoid w, MonadPlus m) => MonadPlus (WriterT w m) where
   mzero         = mzero'
