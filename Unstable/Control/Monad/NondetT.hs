@@ -93,6 +93,10 @@ runNondet (N m)             = liftM toMaybe m
 runNondets          :: Monad m => NondetT m a -> m [a]
 runNondets (N m)    = flatten =<< m 
 
+flatten             :: Monad m => T m a -> m [a]
+flatten Empty       = return []
+flatten (Cons a m)  = liftM (a :) (runNondets m)
+
 mapN                :: Monad m => (m (T m a) -> n (T n b)) -> NondetT m a -> NondetT n b
 mapN f (N m)        = N (f m)
 
@@ -105,10 +109,6 @@ instance Monad m => Functor (T m) where
 
 single              :: Monad m => a -> T m a
 single x            = Cons x mzero
-
-flatten             :: Monad m => T m a -> m [a]
-flatten Empty       = return []
-flatten (Cons a m)  = liftM (a :) (runNondets m)
 
 
 
