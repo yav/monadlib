@@ -30,7 +30,7 @@
 
 ProjectName       = Haskell Monad Transformer Library
 ProjectNameShort  = HSMTL
-ProjectVersion    = 0.1
-ProjectVersionInt = 001
+ProjectVersion    = 1.0
+ProjectVersionInt = 100
 ProjectPatchLevel = 0
 
