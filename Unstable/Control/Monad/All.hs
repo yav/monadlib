@@ -1,5 +1,5 @@
 module Unstable.Control.Monad.All 
-  ( module R, module W, module S, module E, module N, module Re, module C ) where
+  (module R, module W, module S, module E, module N, module Re, module C) where
 
 -- imports everything in the library
 

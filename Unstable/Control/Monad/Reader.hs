@@ -1,9 +1,22 @@
-module Unstable.Control.Monad.Reader (module T, Reader, runReader) where
+-----------------------------------------------------------------------------
+-- |
+-- Copyright   :  (c) OGI at OHSU, 2003
+-- License     :  BSD-style (see the file libraries/base/LICENSE)
+--
+-- Maintainer  :  libraries@haskell.org
+-- Stability   :  experimental
+-- Portability :  non-portable (multi-param classes, functional dependencies)
+--
+-- The implementation of the reader monad.  
+--
+-----------------------------------------------------------------------------
 
-import Unstable.Control.Monad.Identity  
+
+module Unstable.Control.Monad.Reader (module T, Reader, runReader, R.local') where
+
+import Unstable.Control.Monad.Identity 
 import qualified Unstable.Control.Monad.ReaderT as R
 import Unstable.Control.Monad.Trans as T     
-import Control.Monad.Fix
 
 type Reader r     = R.ReaderT r Identity
 

@@ -1,8 +1,37 @@
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Control.Monad.ErrorT
+-- Copyright   :  (c) Andy Gill 2001,
+--                (c) Oregon Graduate Institute of Science and Technology, 2001
+-- License     :  BSD-style (see the file libraries/base/LICENSE)
+--
+-- Maintainer  :  libraries@haskell.org
+-- Stability   :  experimental
+-- Portability :  non-portable (multi-param classes, functional dependencies)
+--
+-- This module contains the implementation of the error monad transformer.
+-- For a description of the methods for raising and handling errors see
+-- module "Unstable.Control.Monad.Trans"
+--
+-----------------------------------------------------------------------------
+
+
+
 module Unstable.Control.Monad.ErrorT (
-	ErrorT,
+        -- * Type and instances
+	ErrorT, 
+        -- ** MonadPlus instance note
+        -- $MonadPlus
+
+        -- ** MonadNondet instance note
+        -- $findAll
+
+        -- * Functions
+        -- ** Removing the transformer
         runError,
-        runErrorT,
-	mapErrorT,
+        -- ** Backward compatibility
+        runErrorT, mapErrorT,
+
 	module T
   ) where
 
@@ -30,28 +59,34 @@ instance (Monad m) => Monad (ErrorT e m) where
                     case a of
                       Left  l -> return (Left l)
                       Right r -> unE (k r))
-  fail      = fail'   -- use 'throwErorr' to throw errors.
+  fail      = fail'   -- use 'throwError' to throw errors.
 
 instance MonadFix m => MonadFix (ErrorT e m) where
   mfix f  = E (mfix (unE . f . either (error "ErrorT: mfix looped") id))
 
 --------------------------------------------------------------------------------
 
-
+-- | Remove the error transformer.  The resulting computation
+-- returns a value of sum type. Errors are reported in the
+-- left component of the sum, while results are reported on the right.
 runError    :: ErrorT e m a -> m (Either e a)
 runError    = unE
 
-runErrorT   :: ErrorT e m a -> m (Either e a)
-runErrorT   = unE
 
-mapErrorT :: (m (Either e a) -> n (Either e' b)) -> ErrorT e m a -> ErrorT e' n b
-mapErrorT f m = E (f (unE m))
+-- | Same as 'runError'.
+-- For backward compatibility.
+runErrorT   :: ErrorT e m a -> m (Either e a)
+runErrorT   = runError
+
+-- | Should be private?
+mapErrorT   :: (m (Either e a) -> n (Either e' b)) -> ErrorT e m a -> ErrorT e' n b
+mapErrorT f = E . f . unE
 
 --------------------------------------------------------------------------------
 
 instance (MonadReader r m) => MonadReader r (ErrorT e m) where
   ask       = ask'
-  local     = local' mapErrorT 
+  local     = local' mapErrorT
 
 instance (MonadWriter w m) => MonadWriter w (ErrorT e m) where
   tell      = tell'
@@ -68,17 +103,28 @@ instance (Monad m) => MonadError e (ErrorT e m) where
                         Left  l -> unE (h l)
                         Right r -> return (Right r))
 
--- MonadPlus is used for Nondet, these should be moved in the nondet class
+-- $MonadPlus
+-- Note that we chose to use the 'MonadPlus' class for nondeterminism, 
+-- and /not/ error handling.  Thus, the implementations of 'mplus' and 'mzero'
+-- do not handle and raise errors, but instead indicate a lack of answer,
+-- or different alternatives.   This differs from the instances for
+-- the 'Maybe' class from the Prelude, which is rather unfortunate.
 instance MonadPlus m => MonadPlus (ErrorT e m) where
   mzero       = mzero'
   mplus       = mplus1' E unE
 
--- `findAll` is like catMaybes, it will aways succeed, but will only return 
--- results that didn't raise an exception.
--- if all results a required, use handle to turn the failures into (tagged) successes.
+
+-- $findAll
+-- The method 'findAll' for errors added after nondeterminism behaves a lot like 
+-- 'catMaybes' from the "Maybe" module.  It never fails,  but will always
+-- return (a possibly empty) list of the answers for the computations that succeeded.
+-- If all results (including failed ones) are required, one can use 'findAllE' instead.
+
 instance MonadNondet m => MonadNondet (ErrorT e m) where
   findAll     = mapErrorT (liftM res . findAll)
     where res xs = Right [ x | Right x <- xs ]
+
+
   commit      = mapErrorT commit
 
 instance MonadResume m => MonadResume (ErrorT e m) where

@@ -1,10 +1,9 @@
-module Unstable.Control.Monad.ResumeT
-  (ResumeT,
-   hyper,
-   module T
-  ) where
+-- | Under construction.
 
-import Prelude(Functor(..),Monad(..),error)
+module Unstable.Control.Monad.ResumeT 
+  (ResumeT, runResume, foldResume, module T) where
+
+import Prelude(Functor(..),Monad(..),error,id,(.))
 import Control.Monad(liftM,MonadPlus(..))
 
 import Unstable.Control.Monad.Trans as T
@@ -30,25 +29,37 @@ instance Monad m => Monad (ResumeT m) where
                      Delay m' -> return (Delay (m' >>= f)))
 
 instance HasBaseMonad m n => HasBaseMonad (ResumeT m) n where
-  inBase    = inBase'
+  inBase  = inBase'
 
 instance Monad m => Functor (Res m) where
   fmap f (Value a)      = Value (f a)
   fmap f (Delay m)      = Delay (liftM f m)
 
+--------------------------------------------------------------------------------
 
-hyper       :: Monad m => ResumeT m a -> m a
-hyper m     = do x <- unRe m
+-- | A general way to "execute" computations in the resumption monad.
+foldResume  :: Monad m => (a -> m b) -> (m b -> m b) -> ResumeT m a -> m b
+foldResume value delay m  
+            = do x <- unRe m
                  case x of
-                   Value a -> return a
-                   Delay m' -> hyper m'
+                   Value a -> value a
+                   Delay m -> delay (foldResume value delay m)
 
-mapResumeT      :: (m (Res m a) -> n (Res n b)) -> ResumeT m a -> ResumeT n b
-mapResumeT f m  = Re (f (unRe m))
+-- | Executes all computations, until a value is reached.  
+runResume   :: Monad m => ResumeT m a -> m a
+runResume   = foldResume return id
+
+
+-- private
+map         :: (m (Res m a) -> n (Res n b)) -> ResumeT m a -> ResumeT n b
+map f       = Re . f . unRe 
+
+--------------------------------------------------------------------------------
+
 
 instance MonadReader r m => MonadReader r (ResumeT m) where
   ask       = ask'
-  local     = local' mapResumeT
+  local     = local' map
 
 instance MonadWriter w m => MonadWriter w (ResumeT m) where
   tell      = tell'
@@ -68,7 +79,7 @@ instance MonadPlus m => MonadPlus (ResumeT m) where
 
 instance MonadNondet m => MonadNondet (ResumeT m) where
   findAll   = error "findAll ResumeT TODO"
-  commit    = mapResumeT commit
+  commit    = map commit
 
 instance Monad m => MonadResume (ResumeT m) where
   delay m   = Re (return (Delay m))
@@ -78,7 +89,7 @@ instance Monad m => MonadResume (ResumeT m) where
                        Delay m' -> unRe m')
 
 instance MonadCont m => MonadCont (ResumeT m) where
-  callCC = callCC1' Re unRe Value
+  callCC    = callCC1' Re unRe Value
 
 
 

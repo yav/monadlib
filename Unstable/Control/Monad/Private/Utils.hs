@@ -1,3 +1,6 @@
+-- | This is a private module and is not to be imported
+-- directly by non-library modules.
+
 module Unstable.Control.Monad.Private.Utils where
 
 import Prelude(Monad(..),(.),String)
@@ -6,8 +9,6 @@ import Control.Monad(MonadPlus(..))
 import Unstable.Control.Monad.Trans
 
 
--- | This is a private module and is not to be imported
--- directly by non-library modules.
 
 
 -- has base

@@ -20,7 +20,10 @@ test1' _  = do a <- callCC $ \jmp -> local (+1) (ask >>= jmp)
                return (a,b)
 
               
-test2' _  = callCC $ \jmp -> tell [1] >> jmp 2
+test2' _  = do callCC $ \jmp -> tell [1] >> jmp 2
+
+test21' _ = do listen (tell [1])
+               tell [2]
 
 -- what should this do?
 test22' _ = do (a,w) <- callCC $ \jmp -> tell [1] >> listen (jmp (3,[])) 
@@ -64,11 +67,21 @@ test1     = do print =<< (runCont $ runReader 7 $ test1' ())
 test2     = do print =<< (runCont $ runWriter $ test2' ())
                print =<< (runWriter $ runCont $ test2' ())
 
-test3     = do print =<< (runCont $ runStateS 7 $ test3' ())
-               print =<< (runStateS 7 $ runCont $ test3' ())
+test21    = do print =<< (runCont $ runWriter $ test21' ())
+               print =<< (runWriter $ runCont $ test21' ())
 
-test32    = do print =<< (runCont $ runStateS [] $ test32' ())
-               print =<< (runStateS [] $ runCont $ test32' ())
+test22    = do print =<< (runCont $ runWriter $ test22' ())
+               print =<< (runWriter $ runCont $ test22' ())
 
-test33    = do print =<< (runCont $ runStateS [] $ test33' ())
-               print =<< (runStateS [] $ runCont $ test33' ())
+test3     = do print =<< (runCont $ runState 7 $ test3' ())
+               print =<< (runState 7 $ runCont $ test3' ())
+
+test32    = do print =<< (runCont $ runState [] $ test32' ())
+               print =<< (runState [] $ runCont $ test32' ())
+
+test33    = do print =<< (runCont $ runState [] $ test33' ())
+               print =<< (runState [] $ runCont $ test33' ())
+
+
+
+

@@ -18,7 +18,7 @@ General:
     - a monad file defines a type synonym, and redefines the "run" functions.
   * The file Transformers imports all transformers
   * The file All imports everything in the library
-    (it is note very useful except for compiling the library)
+    (it is not very useful except for compiling the library)
   * Currently there is no ListT, instead we have NondetT,
     which is (kind of) based on what's in Ralf Hinze's 
     "Deriving Monad Transformers" paper.
@@ -42,41 +42,36 @@ General:
   
 Specific:
 
-Reader: new function runReader (like runReadrT with swapped arguments)  
-Writer: * new function runWriter (same as runWriterT)
-        * new behavior for "listen": it does not produce any output
+For details of what is in the library look at the documentation.
+Here are only some of the differences with the old monadic library.
+
+
+Writer: * new behavior for "listen": it does not produce any output
           thus: oldListen m = do (a,w) <- listen m
                                  tell w
         * moved "pass" out of the class (implemented in terms of the other functions)
-State:  * new functions runState (like evalState with swapped arguments)
-                        runStateS (like runStateT with swapped arguments)
 Error:  * renamed method "throwError" to "raise"
         * renames method "catchError" to "handle"
-        * "throwError" and "cacthError" are defined a sfunctions for compatability
-        * new function runError (same as runErrorT)
+        * "throwError" and "catchError" are defined as functions for compatibility
         * removed Error class, now errors can be of any type
         * fail "" does _not_ cause an error to be thrown  (see comments above)
         * mzero does _not_ cause an error to be thrown  (see comments above)
         * mplus does _not_ handle errors (see comments above)
 Nondet: new
 Resume: new
-Cont:   unfinished
-          - how to do "local" (current seems reasonable, but deviates from "standard" definitions)
-          - how to do "listen"
-          - understand better interaction with other control transformers
-            (exceptions, resumptions, nondeterminism)
+Cont:   currently does not work well, when continuations are outside other transformers
 
 
 People
 ======
 
-discussions etc should probably be sent to:
+Discussions etc should probably be sent to:
 libraries@haskell.org
 
-author of current version:  Iavor S. Diatchki <mailto:diatchki@cse.ogi.edu>
-based upon the original by: Andy Gill <mailto:andy@cse.ogi.edu>
-the ErrorT in the original library was rendered by: Michael Weber <mailto:michael.weber@post.rwth-aachen.de>
-the initial version of the NondetT code in CPS style was from: Andrew J Bromage <mailto:ajb@spamcop.net>
+Author of current version:  Iavor S. Diatchki <mailto:diatchki@cse.ogi.edu>
+Based upon the original by: Andy Gill <mailto:andy@cse.ogi.edu>
+The ErrorT in the original library was rendered by: Michael Weber <mailto:michael.weber@post.rwth-aachen.de>
+The initial version of the NondetT code in CPS style was from (this has now changed): Andrew J Bromage <mailto:ajb@spamcop.net>
 
-iavor: if i forgot someone (sorry!) please send me email 
+iavor: if I forgot someone (sorry!) please send me email and I'll add you 
 

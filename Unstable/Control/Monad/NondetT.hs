@@ -1,15 +1,36 @@
-module Unstable.Control.Monad.NondetT
-  (NondetT,
-   runNondet,
-   runNondets,
-   mapNondetT,
-   MonadPlus(..),
-   module T
+-----------------------------------------------------------------------------
+-- | 
+-- Module      :  Control.Monad.NondetT
+-- Copyright   :  (c) OGI at OHSU, 2003
+-- License     :  BSD-style (see the file libraries/base/LICENSE)
+--
+-- Maintainer  :  libraries@haskell.org
+-- Stability   :  experimental
+-- Portability :  non-portable (multi-param classes, functional dependencies)
+--
+-- This module contains the implementation of the nondetermism and backtracking 
+-- monad transformer.  For descriptions of the methods for dealing with
+-- nondeterminism and backtracking see module "Unstable.Control.Monad.Trans".
+--
+-----------------------------------------------------------------------------
+
+
+module Unstable.Control.Monad.NondetT (
+  -- * Type and instances
+  NondetT, 
+
+  -- * Functions
+  -- ** Removing the transformer
+  runNondet, runNondets,
+
+  MonadPlus(..),
+  module T
   ) where
 
-import Prelude 
+import Prelude hiding (map)
 import Monad(liftM,MonadPlus(..))
 import Control.Monad.Fix
+import Data.Maybe(listToMaybe)
 
 import Unstable.Control.Monad.Trans as T
 import Unstable.Control.Monad.Private.Utils
@@ -34,7 +55,7 @@ instance Monad m => Monad (NondetT m) where
 instance HasBaseMonad m n => HasBaseMonad (NondetT m) n where
   inBase            = inBase'
 
--- is that right?
+-- CHECK: is this definition correct
 instance MonadFix m => MonadFix (NondetT m) where
   mfix f  = N (do x <- mfix (unN . f . hd)
                   case x of
@@ -47,8 +68,24 @@ instance MonadFix m => MonadFix (NondetT m) where
                                   Cons _ m' -> unN m'
                                   _ -> error "NondetT: mfix looped (tl)")
 
+--------------------------------------------------------------------------------
 
--- misc functions
+-- | Remove the nondeterminism transformer.  The resulting computation
+-- returns the first successfull result if any.
+runNondet           :: Monad m => NondetT m a -> m (Maybe a)
+runNondet           = liftM listToMaybe . runNondets
+
+
+-- | Remove the nondeterminism transformer.  The resulting computation
+-- produces a list with all possible results.
+runNondets          :: Monad m => NondetT m a -> m [a]
+runNondets m        = flatten =<< unN m 
+
+map                 :: Monad m => (m (T m a) -> n (T n b)) -> NondetT m a -> NondetT n b
+map f (N m)         = N (f m)
+
+
+-- private:
 instance Monad m => Functor (T m) where
   fmap _ Empty      = Empty
   fmap f (Cons a m) = Cons (f a) (fmap f m)
@@ -62,24 +99,17 @@ flatten Empty       = return []
 flatten (Cons a m)  = liftM (a :) (runNondets m)
 
 
-runNondet           :: Monad m => NondetT m a -> m (Maybe a)
-runNondet m         = do t <- unN m
-                         case t of
-                           Empty -> return Nothing
-                           Cons a _ -> return (Just a)
 
-runNondets          :: Monad m => NondetT m a -> m [a]
-runNondets m        = flatten =<< unN m 
 
-mapNondetT          :: Monad m => (m (T m a) -> n (T n b)) -> NondetT m a -> NondetT n b
-mapNondetT f (N m)  = N (f m)
+--------------------------------------------------------------------------------
+-- public:
 
 
 -- other features.
 
 instance MonadReader r m => MonadReader r (NondetT m) where
   ask               = ask'
-  local             = local' mapNondetT
+  local             = local' map
 
 instance MonadWriter w m => MonadWriter w (NondetT m) where
   tell              = tell'

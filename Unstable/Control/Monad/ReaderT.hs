@@ -1,6 +1,5 @@
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Control.Monad.Reader
 -- Copyright   :  (c) Andy Gill 2001,
 --		  (c) Oregon Graduate Institute of Science and Technology, 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
@@ -9,7 +8,8 @@
 -- Stability   :  experimental
 -- Portability :  non-portable (multi-param classes, functional dependencies)
 --
--- Definition of the reader monad transformer.
+-- The implementation of the reader monad transformer.  For description
+-- of the methods to manipulate the environment see "Unstable.Control.Monad.Trans"
 --
 --	  Inspired by the paper
 --	  /Functional Programming with Overloading and
@@ -19,20 +19,22 @@
 -----------------------------------------------------------------------------
 
 module Unstable.Control.Monad.ReaderT (
-	ReaderT,
-        runReader,
-        runReaderT,
-	mapReaderT,
-	withReaderT,
-	module T,
+        -- * Type and instances
+	ReaderT, 
+        -- * Functions
+        -- ** Removing the transformer
+        runReader, local', 
+        -- ** Backward compatibility
+        runReaderT, mapReaderT, withReaderT,
+	module T
 	) where
 
-import Prelude (Monad(..),Functor(..),const)
+import Prelude (Monad(..),Functor(..),const,(.))
 import Control.Monad (MonadPlus(..),liftM)
 import Control.Monad.Fix
 
 import Unstable.Control.Monad.Trans as T
-import Unstable.Control.Monad.Private.Utils
+import Unstable.Control.Monad.Private.Utils hiding (local')
 
 
 newtype ReaderT r m a = R { unR :: r -> m a }
@@ -41,7 +43,7 @@ newtype ReaderT r m a = R { unR :: r -> m a }
 -- Basic instances
 
 instance MonadTrans (ReaderT r) where 
-  lift m          = R (\_ -> m) 
+  lift m          = R (const m)
 
 instance HasBaseMonad m n => HasBaseMonad (ReaderT r m) n where
   inBase          = inBase'
@@ -58,34 +60,38 @@ instance MonadFix m => MonadFix (ReaderT r m) where
   mfix f          = R (\r -> mfix (\a -> unR (f a) r))
 
 
--- some functions
+--------------------------------------------------------------------------------
 
--- | Remove a reader layer by providing a specific value for the 
--- environment.
+-- | Remove a reader layer by providing a specific value for the environment.
 runReader         :: r -> ReaderT r m a -> m a
 runReader r m     = unR m r
 
+-- | A more general version of 'local' that allows the type of the
+-- environment to be temporarily changed. 
+
+local'            :: (r' -> r) -> ReaderT r m a -> ReaderT r' m a
+local' f m        = R (unR m . f)
+
 -- | Same as 'runReader' but with the arguments the other way around.
--- For backwards compatability.
 runReaderT        :: ReaderT r m a -> r -> m a
 runReaderT        = unR
 
--- | Apply a function to underlying monad.  
--- NOTE: SHOULD THIS BE EXPORTED?
-mapReaderT        :: (m a -> n b) -> ReaderT w m a -> ReaderT w n b
-mapReaderT f m    = R (\r -> f (unR m r))
-
--- | A more general version of 'local' when the reader is the
--- outermost layer.
+-- | Same as 'local''.
 withReaderT       :: (r' -> r) -> ReaderT r m a -> ReaderT r' m a
-withReaderT f m   = R (\r -> unR m (f r))
+withReaderT       = local' 
+
+-- | Apply a function to underlying monad.  
+-- NOTE: Should this be exported?
+mapReaderT        :: (m a -> n b) -> ReaderT w m a -> ReaderT w n b
+mapReaderT f m    = R (f . unR m)
+
 
 
 -- how the features are implemented for readers
 
 instance (Monad m) => MonadReader r (ReaderT r m) where
   ask             = R return
-  local           = withReaderT 
+  local           = local'
 
 instance MonadWriter w m => MonadWriter w (ReaderT r m) where
   tell            = tell'

@@ -1,6 +1,5 @@
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Control.Monad.State
 -- Copyright   :  (c) Andy Gill 2001,
 --		  (c) Oregon Graduate Institute of Science and Technology, 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
@@ -9,7 +8,8 @@
 -- Stability   :  experimental
 -- Portability :  non-portable (multi-param classes, functional dependencies)
 --
--- State monad transformer.
+-- The implementation of the state monad transformer.  For description of
+-- the methods used to manipulate the state see "Unstable.Control.Monad.Trans".
 --
 --	  This module is inspired by the paper
 --	  /Functional Programming with Overloading and
@@ -17,23 +17,25 @@
 --	    Mark P Jones (<http://www.cse.ogi.edu/~mpj/>)
 --		  Advanced School of Functional Programming, 1995.
 --
--- See below for examples.
-
 -----------------------------------------------------------------------------
 
 module Unstable.Control.Monad.StateT (
-	StateT,
-        runState,
-        runStateS,
-        runStateT,
-	evalStateT,
-	execStateT,
-	mapStateT,
-	withStateT,
+        -- * Type and instances
+	StateT, 
+        -- ** MonadNondet instance note
+        -- $forAll
+
+        -- * Functions
+        -- ** Removing the transformer
+        runState, execState, evalState,
+
+        -- ** Backward compatibility
+        runStateT, evalStateT, execStateT, mapStateT, withStateT,
 	module T
+
   ) where
 
-import Prelude (Functor(..),Monad(..),(.),fst)
+import Prelude (Functor(..),Monad(..),(.),fst,snd,flip)
 import Control.Monad(liftM,MonadPlus(..))
 import Control.Monad.Fix
 
@@ -61,34 +63,48 @@ instance (Monad m) => Monad (StateT s m) where
 instance (MonadFix m) => MonadFix (StateT s m) where
   mfix f  = S (\s -> mfix (\ ~(a, _) -> unS (f a) s))
 
+--------------------------------------------------------------------------------
+
+-- | Remove the state monad transformer.  
+-- The underlying monad computes a tuple, containing
+-- an answer in its first argument, and the final state of the computation in the second.
+runState      :: s -> StateT s m a -> m (a,s)
+runState s m  = unS m s
+
+-- | Remove the state monad transformer, ignoring the final state.
+-- Convenient when the state is only used internally in the computation.
+evalState     :: Monad m => s -> StateT s m a -> m a
+evalState s m = liftM fst (runState s m)
+
+-- | Remove the state monad transformer, ignoring the final result.
+-- Convenient when we are only interested in the side effect, i.e. the state.
+execState     :: Monad m => s -> StateT s m a -> m s
+execState s m = liftM snd (runState s m)
 
 
-runState      :: Monad m => s -> StateT s m a -> m a
-runState s m  = liftM fst (runStateS s m)
 
-runStateS     :: s -> StateT s m a -> m (a,s)
-runStateS s m = unS m s
+-- | Similar to 'runState', but with the arguments swapped.
+runStateT     ::(Monad m) => StateT s m a -> s -> m (a,s)
+runStateT     = flip runState
 
+-- | Similar to 'evalState', but with the arguments swapped.
+evalStateT    :: (Monad m) => StateT s m a -> s -> m a
+evalStateT    = flip evalState
 
-runStateT   :: StateT s m a -> s -> m (a,s)
-runStateT   = unS 
+-- | Similar to 'execState', but with the arguments swapped.
+execStateT    :: (Monad m) => StateT s m a -> s -> m s
+execStateT    = flip execState
 
-evalStateT :: (Monad m) => StateT s m a -> s -> m a
-evalStateT m s = do
-	(a, _) <- unS m s
-	return a
+-- | NOTE: What is this for?  
+-- Seems to be the same as: @modify f >> m@
+withStateT      :: Monad m => (s -> s) -> StateT s m a -> StateT s m a
+withStateT f m  = S (unS m . f)
 
-execStateT :: (Monad m) => StateT s m a -> s -> m s
-execStateT m s = do
-	(_, s') <- unS m s
-	return s'
-
-mapStateT :: (m (a, s) -> n (b, s)) -> StateT s m a -> StateT s n b
+-- | NOTE: Should not be exported?
+mapStateT     :: (m (a, s) -> n (b, s)) -> StateT s m a -> StateT s n b
 mapStateT f m = S (f . unS m)
 
-withStateT :: (s -> s) -> StateT s m a -> StateT s m a
-withStateT f m = S (unS m . f)
-
+--------------------------------------------------------------------------------
 
 
 instance (MonadReader r m) => MonadReader r (StateT s m) where
@@ -111,13 +127,19 @@ instance (MonadPlus m) => MonadPlus (StateT s m) where
   mzero       = mzero'
   mplus       = mplus2' S unS
 
--- 'findAll' does not affect the state
--- if interested in the state as well as the result, use 
--- `get` before `findAll`.
--- e.g. findAllSt m = findAll (do x <- m; y <- get; reutrn (x,y))
 instance MonadNondet m => MonadNondet (StateT s m) where
+
   findAll m   = S (\s -> liftM (\xs -> (fmap fst xs,s)) (findAll (unS m s)))
+{- $forAll 
+  This implementation of 'findAll' does not affect the state.
+  It also does not return the state of the different alternatives, 
+  so in a way it is similar to 'runState'.  
+  If the state at the end of each alternative is needed, one can use 'findAllS'.
+-}
+
   commit      = mapStateT commit
+
+
 
 instance MonadResume m => MonadResume (StateT s m) where
   delay       = mapStateT delay

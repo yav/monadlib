@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Control.Monad.Writer
+-- Module      :  Control.Monad.WriterT
 -- Copyright   :  (c) Andy Gill 2001,
 --		  (c) Oregon Graduate Institute of Science and Technology, 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
@@ -9,7 +9,8 @@
 -- Stability   :  experimental
 -- Portability :  non-portable (multi-param classes, functional dependencies)
 --
--- The implementation of the writer transformer.
+-- The implementation of the writer transformer.  For details of the methods
+-- used to manipulate output see "Unstable.Control.Monad.Trans".
 --
 --	  Inspired by the paper
 --	  /Functional Programming with Overloading and
@@ -19,14 +20,26 @@
 -----------------------------------------------------------------------------
 
 module Unstable.Control.Monad.WriterT (
-	WriterT,
-        runWriter,
-        runWriterT,
-	execWriterT,
-	mapWriterT,
+
+        -- * Type and instances
+        WriterT,
+        -- ** MonadWriter instance note
+        -- $listen
+
+        -- ** MonadNondet instance note
+        -- $findAll
+
+        -- * Functions        
+        -- ** Removing the transformer
+	runWriter, evalWriter, execWriter, 
+
+        -- ** Backward compatibility
+        runWriterT, execWriterT, mapWriterT,
+
 	module T,
-	module Monoid,
-  ) where
+	module Monoid
+
+          ) where
 
 import Prelude(Functor(..),Monad(..),fst,snd,(.))
 import Data.Monoid as Monoid (Monoid(..))
@@ -59,16 +72,34 @@ instance (Monoid w, MonadFix m) => MonadFix (WriterT w m) where
   mfix m  = W (mfix (\ ~(a, _) -> unW (m a)))
 
 
- 
+--------------------------------------------------------------------------------
+
+-- | Remove the writer transformer.  
+-- The collected output is returned in the second component of the result tuple. 
 runWriter       :: WriterT w m a -> m (a,w)
 runWriter       = unW
 
+-- | Similar to 'runWriter' except that the result of the computation is ignored.
+-- Convenient for computations, where only the side effect is interesting.
+execWriter      :: Monad m => WriterT w m a -> m w 
+execWriter m    = liftM snd (unW m)
+
+
+-- | Similar to 'runWriter' except that the output is ignored.
+evalWriter      :: Monad m => WriterT w m a -> m a
+evalWriter m    = liftM fst (unW m)
+
+
+
+-- | Same as 'runWriter'.
 runWriterT      :: WriterT w m a -> m (a,w)
-runWriterT      = unW
+runWriterT      = runWriter
 
+-- | Same as 'execWriter'
 execWriterT     :: Monad m => WriterT w m a -> m w
-execWriterT m   = liftM snd (unW m)
+execWriterT     = execWriterT
 
+-- NOTE: Should this be exported?
 mapWriterT      :: (m (a, w) -> n (b, w')) -> WriterT w m a -> WriterT w' n b
 mapWriterT f m  = W (f (unW m))
 
@@ -77,7 +108,12 @@ instance (Monoid w, MonadReader r m) => MonadReader r (WriterT w m) where
   ask           = ask'
   local         = local' mapWriterT 
 
--- different from before, listen produces no output
+-- $listen
+-- Compatibility note: this implementation of the method 'listen' does 
+-- not produce any output.  The old behavior of listen is implemented
+-- by the function 'listenTell'.
+
+
 instance (Monoid w, Monad m) => MonadWriter w (WriterT w m) where
   tell w        = W (return ((), w))
   listen        = mapWriterT (liftM (\(a,w) -> ((a,w),mempty))) 
@@ -94,10 +130,16 @@ instance (Monoid w, MonadPlus m) => MonadPlus (WriterT w m) where
   mzero         = mzero'
   mplus         = mplus1' W unW
 
--- 'findAll' does not produce output
--- if interested in the output use 'listen' before calling 'findAll'.
+
+
+{- $findAll
+    'findAll' does not produce output, and simply ignores the output
+    of the different alternatives.
+    If interested in the output of the alternatives, use 'findAllW' instead.  -}
+
 instance (Monoid w, MonadNondet m) => MonadNondet (WriterT w m) where
   findAll       = mapWriterT (liftM (\xs -> (fmap fst xs, mempty)) . findAll) 
+
   commit        = mapWriterT commit
 
 instance (Monoid w, MonadResume m) => MonadResume (WriterT w m) where

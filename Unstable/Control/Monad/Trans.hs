@@ -18,6 +18,7 @@ module Unstable.Control.Monad.Trans
     listens,
     censor,
     pass,
+    listenTell,
 
     -- ** State
     MonadState(..),   
@@ -35,8 +36,12 @@ module Unstable.Control.Monad.Trans
     catchError,
 
     -- ** Non-determinism
+    MonadPlus(..),
     MonadNondet(..),
     -- $MonadNondetDoc
+    findAllW,
+    findAllS,
+    findAllE,
 
     -- ** Resumptions
     MonadResume(..),
@@ -48,8 +53,8 @@ module Unstable.Control.Monad.Trans
   )
   where
 
-import Prelude (Monad(..),(.),const,IO,Maybe,id)
-import Control.Monad(MonadPlus,liftM)
+import Prelude (Monad(..),(.),const,IO,Maybe,id,Either(..))
+import Control.Monad(MonadPlus(..),liftM)
 
 import Data.Monoid(Monoid)
 
@@ -90,6 +95,7 @@ in what order they are added to a computation, the final effect is the same.
 -- | A reader monad has the ability to propagate around a read-only environment.
 -- One can think of the environment as a special read only variable that can
 -- be accessed via the methods of the class.
+-- See also "Unstable.Control.Monad.ReaderT".
 
 class (Monad m) => MonadReader r m | m -> r where
   ask         :: m r
@@ -117,7 +123,10 @@ asks f        = liftM f ask
 
 
 -- | Temporarily sets the value of the read-only variable. One can think of
--- @localSet x m@ as a @let@ construct.  
+-- @localSet x m@ as:
+-- @
+-- let /var/ = x in m
+-- @ 
 localSet      :: MonadReader r m => r -> m a -> m a
 localSet      = local . const
 
@@ -126,6 +135,8 @@ localSet      = local . const
 -- during a computation.  It is like carrying around a buffer that can be
 -- manipulated with the methods of the class.  The 'Monoid' class specifies
 -- how to make an empty buffer, and how to join two buffers together.
+-- See also "Unstable.Control.Monad.WriterT".
+
 class (Monoid w, Monad m) => MonadWriter w m | m -> w where
   tell        :: w -> m ()
   -- ^ @tell w@ appends the new information @w@ to the buffer.
@@ -160,10 +171,19 @@ pass m        = do ((a,f),w) <- listen m
                    tell (f w)
                    return a
 
+-- | 'listenTell m' behaves just like 'listen m' except that it will produce
+-- the same output as @m@.  This is how 'listen' used to behave in the
+-- older versions of the monadic library.
+listenTell    :: MonadWriter w m => m a -> m (a,w)
+listenTell m  = do x@(_,w) <- listen m
+                   tell w
+                   return x
+
 
 
 -- | A state monad carries around a piece of state.  It is just like
 -- having a read-write variable in an imperative language.
+-- See also "Unstable.Control.Monad.StateT".
 
 class (Monad m) => MonadState s m | m -> s where
   get         :: m s
@@ -188,12 +208,15 @@ modify f      = get >>= put . f
 -- /Control transformers/ are used to manipulate the control flow in a program.
 -- In general they do not commute between themselves and with other transformers.
 -- This means that it is important in what order they are added on top of a monad.
--- Different orders yield monads with different behavior.  See "FeatureInteract.hs".
+-- Different orders yield monads with different behavior.  
+-- TODO: Add examples.
 
 
 
 -- | An error (or exception) monad is aware that computations may fail.
 -- The type @e@ specifies what errors may occur in a computation.
+-- See also "Unstable.Control.Monad.ErrorT".
+
 class (Monad m) => MonadError e m | m -> e where
   raise :: e -> m a
   -- ^ The method @raise e@ raises exception @e@.
@@ -207,11 +230,11 @@ class (Monad m) => MonadError e m | m -> e where
 
 -- $ErrorDoc
 
--- | For backward compatability
+-- | For backward compatibility
 catchError  :: MonadError e m => m a -> (e -> m a) -> m a
 catchError  = handle
 
--- | For backward compatability
+-- | For backward compatibility
 throwError  :: MonadError e m => e -> m a
 throwError  = raise
 
@@ -219,31 +242,58 @@ throwError  = raise
 
 
 -- | A nondeterminism (or backtracking) monad supports computations that 
--- may fail and backtrack or produce multiple results.  
+-- may fail and backtrack, or produce multiple results.  
 --
 -- Currently some of the methods in this class are inherited from 
 -- the class 'MonadPlus' defined in module "Control.Monad".
--- 'mzero' is used to indicate no results. 
--- 'mplus' is used to indicate alternatives.
---
--- Since the use of 'MonadPlus' is somewhat overloaded in Haskell
--- (it is also used for exception handling)
--- in the future 'mzero' and 'mplus' may be added explicitly to this class
--- (with different names).
+-- In this context, we use 'mzero' to indicate no results. 
+-- We use 'mplus' to indicate alternatives.
+-- See also "Unstable.Control.Monad.NondetT".
+
 class (MonadPlus m) => MonadNondet m where
+
   findAll     :: m a -> m [a]
   -- ^ @findAll m@ is analogous to the construct found in logic languages
   -- (e.g. Prolog, Curry). It produces all possible results of @m@.
+
   commit      :: m a -> m a
   -- ^ @commit m@ behaves like @m@ except it will produce at most one result.
   -- Thus, it resembles the /cut/ operator of Prolog.
-  -- (VERIFY) @findAll (commit m)@ should never produce a list with more than one element.
+  -- @findAll (commit m)@ should never produce a list with more than one element.
 
+
+
+-- | This method is useful for computations, where a writer is added after nondeterminism.
+-- If a programmer needs the output of each alternative,
+-- they can use 'findAllW', instead of 'findAll'.
+findAllW      :: (MonadNondet m, MonadWriter w m) => m a -> m [(a,w)]
+findAllW m    = findAll (listen m)
+
+-- | This method is useful for computations, where state is added after nondeterminism.
+-- If a programmer needs the final state after each alternative,
+-- they can use 'findAllS', instead of 'findAll'.
+findAllS      :: (MonadNondet m, MonadState s m) => m a -> m [(a,s)]
+findAllS m    = findAll (do x <- m
+                            s <- get
+                            return (x,s))
+
+-- | This method is useful for computations, where errors are added after nondeterminism.
+-- If a programmer needs all computations, including the ones that failed,
+-- they can use 'findAllS', instead of 'findAll'.  The answers are returned
+-- like in 'run': Errors are injected in the left component of a sum,
+-- while successes are injected on the right.
+findAllE      :: (MonadNondet m, MonadError e m) => m a -> m [Either e a]
+findAllE m    = findAll (handle (liftM Right m) (return . Left))
+
+
+
+-- | See also "Unstable.Control.Monad.NondetT".
 class Monad m => MonadResume m where
   delay       :: m a -> m a
   force       :: m a -> m a
 
--- | TODO.
+
+-- | See also "Unstable.Control.Monad.ContT".
 class (Monad m) => MonadCont m where
   callCC      :: ((a -> m b) -> m a) -> m a
 
