@@ -1,0 +1,7 @@
+1.1: 
+  - Added a class and instances for 'BaseM'. 
+     It provides an easy means to execute a computation
+     in the base layer of a tower of monads.
+  - Added 'update_' and 'poke_' functions that do not return a value.
+1.0: Original version
+

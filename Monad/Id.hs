@@ -18,6 +18,8 @@ instance Monad Id where
   return x          = Id x
   Id x >>= k        = k x
 
+instance BaseM Id Id where inBase x = inBase x
+
 instance MonadFix Id where
   mfix f            = let r@(Id x) = f x
                       in r

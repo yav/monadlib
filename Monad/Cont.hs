@@ -28,6 +28,7 @@ instance Monad (Cont o) where
   return x        = C (\k -> k x)
   C m1 >>= k      = C (\k1 -> m1 (\a -> let C m2 = k a
                                         in m2 k1))
+instance BaseM (Cont o) (Cont o) where inBase x = x
 
 instance ContM (Cont o) where
   callcc f        = C (\k -> let C m = f (\a -> C (\_ -> k a)) in m k)

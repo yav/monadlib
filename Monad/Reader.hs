@@ -21,6 +21,8 @@ instance Monad (Reader r) where
   R m >>= k         = R (\r -> let R n = k (m r)
                                in n r)
 
+instance BaseM (Reader r) (Reader r) where inBase x = x
+
 instance MonadFix (Reader r) where
   mfix f            = R (\r -> let R n = f a
                                    a   = n r

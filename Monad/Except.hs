@@ -24,6 +24,8 @@ instance Monad (Except r) where
   return a          = E (\ok _ -> ok a)
   E f >>= k         = E (\ok fail -> f (\a -> let E g = k a in g ok fail) fail)
 
+instance BaseM (Except r) (Except r) where inBase x = x
+
 instance MonadFix (Except e) where
   mfix f            = E (\ok fail -> let E g   = f a
                                          (a,r) = g (\a -> (a,ok a)) (\x -> (error "Except: mfix looped", fail x))

@@ -88,6 +88,8 @@ instance Monad (BackT m) where
 instance Trans BackT where
   lift m            = B (\no yes ch -> yes =<< m)
 
+instance BaseM m b => BaseM (BackT m) b where
+  inBase m          = lift (inBase m)
 
 instance MonadFix m => MonadFix (BackT m) where
   mfix f            = B (\no yes ch -> mdo let B m = f a 

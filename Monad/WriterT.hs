@@ -56,6 +56,9 @@ instance Trans (WriterT w) where
   lift m            = W (do a <- m
                             return (a,id))
 
+instance BaseM m b => BaseM (WriterT w m) b where
+  inBase m          = lift (inBase m)
+
 instance MonadFix m => MonadFix (WriterT w m) where
   mfix f            = W (mdo let W m = f a
                              ~(a,w) <- m

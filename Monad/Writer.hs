@@ -29,6 +29,8 @@ instance Monad (Writer w) where
   return a          = W (a,id)
   W ~(a,w1) >>= k   = W (let W (b,w2) = k a in (b, w1 . w2))
 
+instance BaseM (Writer w) (Writer w) where inBase x = x
+
 instance MonadFix (Writer w) where
   mfix f            = W (let W r@(a,w) = f a in r)
 

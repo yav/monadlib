@@ -57,6 +57,8 @@ instance Monad (ContT o m) where
 instance Trans (ContT o) where
   lift m            = C (\k -> k =<< m) 
 
+instance BaseM m b => BaseM (ContT o m) b where
+  inBase m          = lift (inBase m)
 
 -- $ReaderM
 -- Jumping does not affect context, i.e. the context at the target 

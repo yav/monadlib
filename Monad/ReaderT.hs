@@ -39,6 +39,9 @@ instance Monad m => Monad (ReaderT r m) where
                                   let R m2 = k a
                                   m2 r)
 
+instance BaseM m b => BaseM (ReaderT r m) b where
+  inBase m          = lift (inBase m)
+
 instance Trans (ReaderT r) where
   lift m            = R (\_ -> m)
 

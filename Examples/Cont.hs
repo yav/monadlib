@@ -23,11 +23,13 @@ runReaderOut        = (runCont $ runReader 3 $ testReader ()) >>= print
 runReaderIn         = (runReader 3 $ runCont $ testReader ()) >>= print
 
 
-testWriter ()       = do l <- callcc twice
+testWriter ()       = do put "A"
+                         l <- callcc twice
                          put "*"
                          case l of
                            One jumpBack -> jumpBack
                            Two          -> return ()
+                         put "B"
                         
 runWriterOut        = (runCont $ execWriter $ testWriter ()) >>= print
 runWriterIn         = (execWriter $ runCont $ testWriter ()) >>= print

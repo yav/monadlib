@@ -8,6 +8,18 @@ class Trans t where
   -- | Lift a computation in the underlying monad, to the constructed monad.
   lift             :: Monad m => m a -> t m a
 
+
+-- | Provides means to execute a computation in the base of
+-- a tower of monads.
+class (Monad m, Monad b) => BaseM m b | m -> b where
+  inBase           :: b a -> m a
+
+instance BaseM IO IO where inBase x = x
+instance BaseM [] [] where inBase x = x
+instance BaseM Maybe Maybe where inBase x = x
+
+
+
 -- | Monads that provide access to a context.
 class Monad m => ReaderM m r | m -> r where
   
@@ -49,6 +61,13 @@ update             :: StateM m s => (s -> s) -> m s
 update f            = do x <- peek
                          poke (f x)
                          return x
+
+update_            :: StateM m s => (s -> s) -> m ()
+update_ f           = update f >> return ()
+
+poke_              :: StateM m s => s -> m ()
+poke_ s             = poke s >> return ()
+
 
 -- | Monads that can throw and catch exceptions.
 class Monad m => ExceptM m e | m -> e where

@@ -34,6 +34,8 @@ instance Monad (State s) where
                                  S n    = k a
                              in n s1)
 
+instance BaseM (State s) (State s) where inBase x = x
+
 instance MonadFix (State s) where
   mfix f          = S (\s -> let S m    = f (fst r)
                                  r      = m s 

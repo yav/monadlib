@@ -58,6 +58,9 @@ instance Trans (StateT s) where
   lift m            = S (\s -> do x <- m
                                   return (x,s))
 
+instance BaseM m b => BaseM (StateT s m) b where
+  inBase m          = lift (inBase m)
+
 instance MonadFix m => MonadFix (StateT s m) where
   mfix f            = S (\s -> mfix (\it -> let S m = f (fst it)
                                             in m s))

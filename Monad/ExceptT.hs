@@ -50,6 +50,9 @@ instance Monad (ExceptT x m) where
 instance Trans (ExceptT x) where
   lift m            = E (\ok _ -> ok =<< m)
 
+instance BaseM m b => BaseM (ExceptT x m) b where
+  inBase m          = lift (inBase m)
+
 instance MonadFix m => MonadFix (ExceptT x m) where
   mfix f            = E (\ok fail -> mdo let E g = f a
                                          ~(a,r) <- g (\a -> do r <- ok a
