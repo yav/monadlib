@@ -1,3 +1,11 @@
+18 Nov 2003:  Did some leakage analisys: NondetT and WriterT may leak.
+As usual this because of a fine interaction with lazyness.  
+The problem with Writer is if the "output" is not looked at.
+The poblem with Nondet occurs of the "alternatives" are not looked at.
+
+
+
+
 This is an experimental replacement for the current monad library.
 (at some point the Unstable. part of the names should disappear)
 
