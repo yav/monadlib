@@ -68,29 +68,30 @@ instance MapTrans NondetT where
 
 -- CHECK: is this definition correct
 instance MonadFix m => MonadFix (NondetT m) where
-  mfix f  = N (do x <- mfix (unN . f . hd)
-                  case x of
-                    Empty    -> return Empty
-                    Cons a _ -> return (Cons a (mfix (tl . f))))
-    where hd (Cons a _) = a
-          hd _          = error "NondetT: mfix looped (hd)"
-          tl m          = N (do x <- unN m
-                                case x of
-                                  Cons _ m' -> unN m'
-                                  _ -> error "NondetT: mfix looped (tl)")
+  mfix f  = N (liftM tie (mfix (unN . f . hd)))
+    where tie Empty       = Empty
+          tie (Cons a _)  = Cons a (mfix (tl . f))
+          hd (Cons a _)   = a
+          hd _            = error "NondetT: mfix looped (hd)"
+          tl m            = N (do x <- unN m
+                                  case x of
+                                    Cons _ m' -> unN m'
+                                    _ -> error "NondetT: mfix looped (tl)")
 
 --------------------------------------------------------------------------------
 
 -- | Remove the nondeterminism transformer.  The resulting computation
--- returns the first successfull result if any.
+-- returns just the first result if any.
 runNondet           :: Monad m => NondetT m a -> m (Maybe a)
-runNondet           = liftM listToMaybe . runNondets
+runNondet (N m)             = liftM toMaybe m
+  where toMaybe Empty       = Nothing
+        toMaybe (Cons x _)  = Just x
 
 
 -- | Remove the nondeterminism transformer.  The resulting computation
 -- produces a list with all possible results.
 runNondets          :: Monad m => NondetT m a -> m [a]
-runNondets m        = flatten =<< unN m 
+runNondets (N m)    = flatten =<< m 
 
 mapN                :: Monad m => (m (T m a) -> n (T n b)) -> NondetT m a -> NondetT n b
 mapN f (N m)        = N (f m)
@@ -143,13 +144,12 @@ instance Monad m => MonadPlus (NondetT m) where
 
 instance Monad m => MonadNondet (NondetT m) where
   findAll m         = lift (runNondets m)
-  commit m          = N (do x <- unN m
-                            case x of
-                              Empty -> return Empty
-                              Cons a _ -> return (single a))
+  commit (N m)      = N (liftM hd' m) 
+    where hd' Empty       = Empty
+          hd' (Cons a _)  = single a
 
 instance MonadResume m => MonadResume (NondetT m) where
-  delay                 = mapN delay
+  delay (N m)           = N (delay m)
   step v d (N m)        = N (step v' d' m)
     where v' Empty      = return Empty
           v' (Cons a n) = unN (v a `mplus` step v d n)
