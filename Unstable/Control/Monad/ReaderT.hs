@@ -9,7 +9,7 @@
 -- Portability :  non-portable (multi-param classes, functional dependencies)
 --
 -- The implementation of the reader monad transformer.  For description
--- of the methods to manipulate the environment see "Unstable.Control.Monad.Trans"
+-- of the methods to manipulate the environment see the 'MonadReader' class.
 --
 --	  Inspired by the paper
 --	  /Functional Programming with Overloading and

@@ -10,7 +10,7 @@
 -- Portability :  non-portable (multi-parameter type classes)
 --
 -- The implementation of the continuation monad transformer.
--- For description of the methods to use continuations see "Unstable.Control.Monad.Trans".
+-- For description of the methods to use continuations see the 'MonadCont' class.
 --
 -----------------------------------------------------------------------------
 

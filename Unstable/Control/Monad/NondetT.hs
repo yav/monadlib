@@ -1,6 +1,5 @@
 -----------------------------------------------------------------------------
 -- | 
--- Module      :  Control.Monad.NondetT
 -- Copyright   :  (c) OGI at OHSU, 2003
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
 --
@@ -10,7 +9,7 @@
 --
 -- This module contains the implementation of the nondetermism and backtracking 
 -- monad transformer.  For descriptions of the methods for dealing with
--- nondeterminism and backtracking see module "Unstable.Control.Monad.Trans".
+-- nondeterminism and backtracking see the 'MonadNondet' and 'MonadPlus' classes.
 --
 -----------------------------------------------------------------------------
 

@@ -1,6 +1,5 @@
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Control.Monad.WriterT
 -- Copyright   :  (c) Andy Gill 2001,
 --		  (c) Oregon Graduate Institute of Science and Technology, 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
@@ -10,7 +9,7 @@
 -- Portability :  non-portable (multi-param classes, functional dependencies)
 --
 -- The implementation of the writer transformer.  For details of the methods
--- used to manipulate output see "Unstable.Control.Monad.Trans".
+-- used to manipulate output see the 'MonadWriter' class.
 --
 --	  Inspired by the paper
 --	  /Functional Programming with Overloading and

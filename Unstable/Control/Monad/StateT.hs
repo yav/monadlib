@@ -9,7 +9,7 @@
 -- Portability :  non-portable (multi-param classes, functional dependencies)
 --
 -- The implementation of the state monad transformer.  For description of
--- the methods used to manipulate the state see "Unstable.Control.Monad.Trans".
+-- the methods used to manipulate state see the 'MonadState' class.
 --
 --	  This module is inspired by the paper
 --	  /Functional Programming with Overloading and

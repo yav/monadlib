@@ -11,7 +11,7 @@
 --
 -- This module contains the implementation of the error monad transformer.
 -- For a description of the methods for raising and handling errors see
--- module "Unstable.Control.Monad.Trans"
+-- the 'MonadError' class.
 --
 -----------------------------------------------------------------------------
 
