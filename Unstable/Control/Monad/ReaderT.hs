@@ -117,7 +117,9 @@ instance (MonadNondet m) => MonadNondet (ReaderT r m) where
 
 instance MonadResume m => MonadResume (ReaderT r m) where
   delay           = mapReaderT delay
-  force           = mapReaderT force
+  step v d (R m)  = R (\e -> let v' = runReader e . v 
+                                 d' = runReader e . d . R . const
+                             in step v' d' (m e))
 
 instance MonadCont m => MonadCont (ReaderT r m) where
   callCC          = callCC2' R unR const 

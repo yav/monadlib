@@ -131,8 +131,13 @@ instance MonadNondet m => MonadNondet (ErrorT e m) where
   commit      = mapErrorT commit
 
 instance MonadResume m => MonadResume (ErrorT e m) where
-  delay       = mapErrorT delay
-  force       = mapErrorT force
+  delay           = mapErrorT delay
+  step v d (E m)  = E (step v' d' m)
+    where v' (Left e)   = return (Left e)
+          v' (Right a)  = unE (v a)
+          d' m          = unE (d (E m))
+
+
 
 instance (MonadCont m) => MonadCont (ErrorT e m) where
   callCC            = callCC1' E unE Right

@@ -145,8 +145,27 @@ instance MonadNondet m => MonadNondet (StateT s m) where
 
 
 instance MonadResume m => MonadResume (StateT s m) where
-  delay       = mapStateT delay
-  force       = mapStateT force
+
+  -- When a delayed computation is activated,
+  -- it resumes with the state at the time of the delay.
+  delay           = mapStateT delay
+
+
+  step v d m      = S (\s -> let v' (a,s')  = runState s (v a)   -- or s'?
+                                 d' n       = runState s (d (S (const n)))
+                             in step v' d' (runState s m))
+
+
+-- State out
+-- s -> Mu X. m (Either (a,s) X)
+-- Give me an initial state, and then it may take a few steps 
+-- before we compute the next state.  Paused computations are stateless.
+
+
+-- State in
+-- Mu X. s -> m (Either (a,s) X)
+-- Paused computations are stateful.
+
 
 -- jumping undoes changes to the state state
 instance MonadCont m => MonadCont (StateT s m) where

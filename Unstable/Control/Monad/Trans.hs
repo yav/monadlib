@@ -46,7 +46,7 @@ module Unstable.Control.Monad.Trans
 
     -- ** Resumptions
     MonadResume(..),
-    -- $MonadResumeDoc
+    -- $MonadGenResumeDoc
 
     -- ** Continuations
     MonadCont(..),
@@ -54,9 +54,7 @@ module Unstable.Control.Monad.Trans
   )
   where
 
-import Prelude (Monad(..),(.),const,IO,Maybe,id,Either(..))
 import Control.Monad(MonadPlus(..),liftM)
-
 import Data.Monoid(Monoid)
 
 
@@ -295,10 +293,12 @@ findAllE m    = findAll (handle (liftM Right m) (return . Left))
 
 
 
--- | See also "Unstable.Control.Monad.NondetT".
+-- | See also "Unstable.Control.Monad.ResumeT".
 class Monad m => MonadResume m where
   delay       :: m a -> m a
-  force       :: m a -> m a
+  step        :: (a -> m b) -> (m a -> m b) -> m a -> m b
+
+
 
 
 -- | See also "Unstable.Control.Monad.ContT".

@@ -11,6 +11,9 @@
 -- monad transformer.  For descriptions of the methods for dealing with
 -- nondeterminism and backtracking see the 'MonadNondet' and 'MonadPlus' classes.
 --
+-- This implementation is similar to the one described in:
+-- "Deriving Monad Transformers"
+-- by Ralf Hinze
 -----------------------------------------------------------------------------
 
 
@@ -144,11 +147,20 @@ instance Monad m => MonadNondet (NondetT m) where
                               Empty -> return Empty
                               Cons a _ -> return (single a))
 
+instance MonadResume m => MonadResume (NondetT m) where
+  delay                 = mapN delay
+  step v d (N m)        = N (step v' d' m)
+    where v' Empty      = return Empty
+          v' (Cons a n) = unN (v a `mplus` step v d n)
+          d' m          = unN (d (N m))
+
+
 -- ergh, what does this do?
 instance (MonadCont m) => MonadCont (NondetT m) where
   callCC            = callCC1' N unN single
 
    
+
 
 
 

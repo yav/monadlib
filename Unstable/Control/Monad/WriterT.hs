@@ -143,9 +143,21 @@ instance (Monoid w, MonadNondet m) => MonadNondet (WriterT w m) where
 
   commit        = mapWriterT commit
 
+
+-- TODO: can we add a function that will give acess to the output as well,
+-- e.g. something like findAllW above.
+
+-- ???
+-- in this version the outputs of the "differetn threads" should be separate
+-- when combined the other way around (resumptions after output) the threads
+-- share a common channel
 instance (Monoid w, MonadResume m) => MonadResume (WriterT w m) where
-  delay         = mapWriterT delay
-  force         = mapWriterT force
+  delay             = mapWriterT delay 
+  step v d (W m)    = W (step (unW . v . fst) (unW . d . W) m)
+                     
+
+
+
 
 -- jumping undoes the output
 instance (Monoid w, MonadCont m) => MonadCont (WriterT w m) where

@@ -1,14 +1,31 @@
--- | Under construction.
+-----------------------------------------------------------------------------
+-- |
+-- Copyright   :  (c) OGI at OHSU, 2003
+-- License     :  BSD-style (see the file libraries/base/LICENSE)
+--
+-- Maintainer  :  libraries@haskell.org
+-- Stability   :  experimental
+-- Portability :  non-portable (multi-param classes, functional dependencies)
+--
+-- The implementation of the resumption transformer.
+-- For details on the methods used to manipulate resumptions see the class 'MonadResume'.
+--
+-- This implementation of resumptions was inspired from the paper
+-- "A syntactic Approach to Modulariy in Denotational Semantics"
+-- by Pietro Canciarelli and Eugenio Moggi
+-----------------------------------------------------------------------------
+
+
 
 module Unstable.Control.Monad.ResumeT 
-  (ResumeT, runResume, foldResume, module T) where
+  (ResumeT, runResume, foldResume, foldResume', module T) where
 
 import Control.Monad(liftM,MonadPlus(..))
 
+import Control.Monad.Fix
 import Unstable.Control.Monad.Trans as T
 import Unstable.Control.Monad.Private.Utils
 
--- resumptions
 
 newtype ResumeT m a   = Re { unRe :: m (Res m a) }
 data Res m a          = Value a | Delay (ResumeT m a)
@@ -37,8 +54,6 @@ instance MapTrans ResumeT where
     mapMT_Res (Value a)     = Value a
 
 
-
-
 instance Monad m => Functor (Res m) where
   fmap f (Value a)      = Value (f a)
   fmap f (Delay m)      = Delay (liftM f m)
@@ -53,9 +68,12 @@ foldResume value delay m
                    Value a -> value a
                    Delay m -> delay (foldResume value delay m)
 
+foldResume' done paused = step done (paused . foldResume' done paused)
+
+
 -- | Executes all computations, until a value is reached.  
 runResume   :: Monad m => ResumeT m a -> m a
-runResume   = foldResume return id
+runResume m = foldResume return id m
 
 
 -- private
@@ -90,11 +108,11 @@ instance MonadNondet m => MonadNondet (ResumeT m) where
   commit    = mapR commit
 
 instance Monad m => MonadResume (ResumeT m) where
-  delay m   = Re (return (Delay m))
-  force m   = Re (do x <- unRe m
-                     case x of
-                       Value a  -> return (Value a)
-                       Delay m' -> unRe m')
+  delay m         = Re (return (Delay m))
+  step v d (Re m) = Re (do x <- m
+                           case x of
+                             Value a -> unRe (v a)
+                             Delay m' -> unRe (d m'))
 
 instance MonadCont m => MonadCont (ResumeT m) where
   callCC    = callCC1' Re unRe Value

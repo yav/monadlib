@@ -7,7 +7,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable (multi-param classes, functional dependencies)
 --
--- The implementation of the resumption monad.  
+-- The implementation of the resumption monad.  Is this terribly useful?
 --
 -----------------------------------------------------------------------------
 
