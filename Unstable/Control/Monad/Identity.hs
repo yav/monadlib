@@ -24,7 +24,7 @@
 module Unstable.Control.Monad.Identity (Identity, runIdentity) where
 
 import Prelude(Functor(..),Monad(..),(.))
-import Monad(liftM)
+import Control.Monad(liftM)
 import Control.Monad.Fix
 
 

@@ -29,7 +29,7 @@ module Unstable.Control.Monad.NondetT (
   module T
   ) where
 
-import Monad(liftM,MonadPlus(..))
+import Control.Monad(liftM,MonadPlus(..))
 import Control.Monad.Fix
 import Data.Maybe(listToMaybe)
 
