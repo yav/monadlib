@@ -45,7 +45,8 @@ instance Monad m => Monad (ResumeT m) where
                      Delay m' -> return (Delay (m' >>= f)))
 
 instance HasBaseMonad m n => HasBaseMonad (ResumeT m) n where
-  inBase  = inBase'
+  inBase    = inBase'
+  mapBase f = mapBase' f 
 
 instance MapTrans ResumeT where
   mapTrans f (Re m)        = Re (f (liftM mapMT_Res m))

@@ -49,6 +49,7 @@ instance MonadTrans (StateT s) where
 
 instance HasBaseMonad m n => HasBaseMonad (StateT s m) n where
   inBase    = inBase'
+  mapBase f = mapBase' f
 
 instance MapTrans (StateT s) where
   mapTrans f m = S (f . unS m)

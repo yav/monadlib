@@ -15,6 +15,9 @@ import Unstable.Control.Monad.Trans
 inBase'       :: (HasBaseMonad m n, MonadTrans t) => n a -> t m a
 inBase' m     = lift (inBase m)
 
+mapBase'      :: (HasBaseMonad m n, MapTrans t) => (forall a. n a -> n a) -> t m a -> t m a
+mapBase' f    = mapTrans (mapBase f)
+
 -- monad 
 return'       :: (Monad m, MonadTrans t) => a -> t m a
 return' x     = lift (return x)

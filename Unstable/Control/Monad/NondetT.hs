@@ -55,6 +55,7 @@ instance Monad m => Monad (NondetT m) where
 
 instance HasBaseMonad m n => HasBaseMonad (NondetT m) n where
   inBase            = inBase'
+  mapBase f         = mapBase' f
 
 instance MapTrans NondetT where
   mapTrans f (N m)      = N (f (liftM mapMT_T m))

@@ -44,7 +44,9 @@ instance MonadTrans (ContT r) where
   lift m      = C (m >>=)
 
 instance HasBaseMonad m n => HasBaseMonad (ContT r m) n where
-  inBase      = inBase'
+  inBase          = inBase'
+  mapBase f (C m) = C (mapBase f . m)
+
 
 instance (Monad m) => Functor (ContT r m) where
   fmap        = liftM

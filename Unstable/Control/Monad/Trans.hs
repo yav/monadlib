@@ -76,6 +76,12 @@ class (Monad m, Monad n) => HasBaseMonad m n | m -> n where
   -- ^ Provides a way of going across multiple transformer layers,
   -- all the way to the innermost atomic monad.
 
+  mapBase :: (forall a. n a -> n a) -> m a -> m a
+  -- ^ Provides a way to apply a function in the base monad,
+  -- it involves applying 'mapTrans' repeatedly.
+
+
+
 
 -- | This class enables a programmer to change the underlying monad of a computation.
 class MonadTrans t => MapTrans t where
@@ -83,9 +89,9 @@ class MonadTrans t => MapTrans t where
 
 
 -- Move me somewhere else.
-instance HasBaseMonad IO IO where inBase = id
-instance HasBaseMonad [] [] where inBase = id
-instance HasBaseMonad Maybe Maybe where inBase = id
+instance HasBaseMonad IO IO where inBase = id; mapBase f = f
+instance HasBaseMonad [] [] where inBase = id; mapBase f = f
+instance HasBaseMonad Maybe Maybe where inBase = id; mapBase f = f
 
 
 
