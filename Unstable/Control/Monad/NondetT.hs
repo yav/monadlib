@@ -55,6 +55,15 @@ instance Monad m => Monad (NondetT m) where
 instance HasBaseMonad m n => HasBaseMonad (NondetT m) n where
   inBase            = inBase'
 
+instance MapTrans NondetT where
+  mapTrans f (N m)      = N (f (liftM mapMT_T m))
+    where 
+    mapMT_T Empty       = Empty
+    mapMT_T (Cons a m)  = Cons a (mapTrans f m)
+
+
+
+
 -- CHECK: is this definition correct
 instance MonadFix m => MonadFix (NondetT m) where
   mfix f  = N (do x <- mfix (unN . f . hd)

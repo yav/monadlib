@@ -58,6 +58,9 @@ instance (Monoid w) => MonadTrans (WriterT w) where
 instance (Monoid w, HasBaseMonad m n) => HasBaseMonad (WriterT w m) n where
   inBase        = inBase'
 
+instance Monoid w => MapTrans (WriterT w) where
+  mapTrans f m  = W (f (unW m))
+
 instance (Monoid w, Monad m) => Functor (WriterT w m) where
   fmap          = liftM
 

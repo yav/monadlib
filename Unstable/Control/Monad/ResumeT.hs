@@ -31,6 +31,15 @@ instance Monad m => Monad (ResumeT m) where
 instance HasBaseMonad m n => HasBaseMonad (ResumeT m) n where
   inBase  = inBase'
 
+instance MapTrans ResumeT where
+  mapTrans f (Re m)        = Re (f (liftM mapMT_Res m))
+    where
+    mapMT_Res (Delay m)     = Delay (mapTrans f m)
+    mapMT_Res (Value a)     = Value a
+
+
+
+
 instance Monad m => Functor (Res m) where
   fmap f (Value a)      = Value (f a)
   fmap f (Delay m)      = Delay (liftM f m)

@@ -2,6 +2,7 @@ module Unstable.Control.Monad.Trans
   ( -- * General transformer classes
     MonadTrans(..),
     HasBaseMonad(..),
+    MapTrans(..),
 
     -- * Plumbing transformers
     -- $PlumbingDoc
@@ -76,6 +77,11 @@ class (Monad m, Monad n) => HasBaseMonad m n | m -> n where
   inBase :: n a -> m a
   -- ^ Provides a way of going across multiple transformer layers,
   -- all the way to the innermost atomic monad.
+
+
+-- | This class enables a programmer to change the underlying monad of a computation.
+class MonadTrans t => MapTrans t where
+  mapTrans :: (Monad m, Monad n) => (forall a. m a -> n a) -> t m b -> t n b
 
 
 -- Move me somewhere else.

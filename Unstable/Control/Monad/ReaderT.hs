@@ -48,6 +48,9 @@ instance MonadTrans (ReaderT r) where
 instance HasBaseMonad m n => HasBaseMonad (ReaderT r m) n where
   inBase          = inBase'
 
+instance MapTrans (ReaderT r) where
+  mapTrans f m    = R (f . unR m)
+
 instance Monad m => Functor (ReaderT r m) where
   fmap            = liftM
 

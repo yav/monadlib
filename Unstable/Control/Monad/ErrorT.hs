@@ -50,6 +50,9 @@ instance MonadTrans (ErrorT e) where
 instance HasBaseMonad m n => HasBaseMonad (ErrorT e m) n where
   inBase    = inBase'
 
+instance MapTrans (ErrorT e) where
+  mapTrans f m = E (f (unE m))
+
 instance (Monad m) => Functor (ErrorT e m) where
   fmap      = liftM
 
