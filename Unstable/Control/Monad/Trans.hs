@@ -16,6 +16,7 @@ module Unstable.Control.Monad.Trans
     -- ** Writer
     MonadWriter(..),
     -- $MonadWriterDoc
+    listen_,
     listens,
     censor,
     pass,
@@ -166,6 +167,10 @@ of functions, rather then their inputs.
 -- | Gets specific component of the output, using the projection function supplied.
 listens       :: (MonadWriter w m) => (w -> b) -> m a -> m (a, b)
 listens f m   = liftM (\ ~(a,w) -> (a,f w)) (listen m)
+
+-- | Gets only the output, ignoring the result
+listen_      :: (MonadWriter w m) => m a -> m w
+listen_       = liftM snd . listen
 
 
 -- | @censor f m@ behaves like @m@ except its output is modified by @f@. 
