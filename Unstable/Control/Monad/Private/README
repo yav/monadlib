@@ -1,0 +1,4 @@
+The files in this directory are internal to the library.
+User program should not use them, as the may change or
+disappear without a warning.
+

@@ -1,0 +1,14 @@
+Package {
+	name		= PACKAGE,
+        import_dirs     = [ "${pkglibdir}/imports" ],
+        source_dirs     = [],
+        library_dirs    = [ "${pkglibdir}" ],
+	hs_libraries	= [ LIBRARY ],
+	extra_libraries	= [],
+	include_dirs	= [],
+	c_includes	= [],
+	package_deps	= [ PACKAGE_DEPS ],
+	extra_ghc_opts	= [],
+	extra_cc_opts	= [],
+	extra_ld_opts	= []
+}
