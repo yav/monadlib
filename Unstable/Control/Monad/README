@@ -3,7 +3,7 @@ This is an experimental replacement for the current monad library.
 
 It is mostly complete, but some more work is needed in places,
 in particular the interaction of continuations with other features.
-also a lot more tests/laws are need.  and of course documentation.
+also a lot more tests/laws are need.  
 
 Resumptions are very new and not well tested.  Also the nonstandard
 morphisms for them are not fixed.

@@ -60,7 +60,7 @@ instance (Monad m) => Functor (StateT s m) where
 
 instance (Monad m) => Monad (StateT s m) where
   return    = return'
-  m >>= k   = S (\s -> do (a, s') <- unS m s
+  m >>= k   = S (\s -> do ~(a, s') <- unS m s
 		          unS (k a) s')
   fail      = fail'
 

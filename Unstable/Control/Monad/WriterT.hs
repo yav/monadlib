@@ -65,8 +65,8 @@ instance (Monoid w, Monad m) => Functor (WriterT w m) where
 
 instance (Monoid w, Monad m) => Monad (WriterT w m) where
   return        = return'
-  m >>= f       = W (do (a, w)  <- unW m
-		        (b, w') <- unW (f a)
+  m >>= f       = W (do ~(a, w)  <- unW m
+		        ~(b, w') <- unW (f a)
 		        return (b, w `mappend` w'))
   fail          = fail'
 
@@ -118,7 +118,7 @@ instance (Monoid w, MonadReader r m) => MonadReader r (WriterT w m) where
 
 instance (Monoid w, Monad m) => MonadWriter w (WriterT w m) where
   tell w        = W (return ((), w))
-  listen        = mapWriterT (liftM (\(a,w) -> ((a,w),mempty))) 
+  listen        = mapWriterT (liftM (\ ~(a,w) -> ((a,w),mempty))) 
 
 instance (Monoid w, MonadState s m) => MonadState s (WriterT w m) where
   get           = get'
