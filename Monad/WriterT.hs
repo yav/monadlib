@@ -17,6 +17,7 @@ module Monad.WriterT
     -- $ContM
  
   WriterT, runWriter, evalWriter, execWriter, module Monad.Prelude
+  , module Monad.Monoid
   ) where
 
 import Monad.Prelude

@@ -1,6 +1,9 @@
 
-module Monad.Writer (Writer, runWriter, evalWriter, execWriter, 
-      module Monad.Prelude) where
+module Monad.Writer 
+  ( Writer, runWriter, evalWriter, execWriter
+  , module Monad.Prelude
+  , module Monad.Monoid
+  ) where
 
 import Monad.Prelude
 import Control.Monad.Fix

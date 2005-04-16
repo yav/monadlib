@@ -89,6 +89,12 @@ class Monad m => ExceptM m e | m -> e where
   handle           :: m a -> (e -> m a) -> m a
 
 
+-- | Install an error handler that ignores the exception.
+-- | The handler is the second argument.
+handle_            :: ExceptM m e => m a -> m a -> m a
+handle_ m h         = m `handle` \_ -> h
+
+
 -- | Monads that allow for explicit handling of continuations.
 class Monad m => ContM m where
 
@@ -132,6 +138,7 @@ partitionM p (a:as) = do b <- p a
                          (xs,ys) <- partitionM   p as
                          return (if b then (a:xs,ys) else (xs,a:ys))
 
+-- | Combine 3 lists using a monadic funciton.
 zipWith3M          :: Monad m => (a -> b -> c -> m d) -> [a] -> [b] -> [c] -> m [d]
 zipWith3M f [] _ _                = return []
 zipWith3M f _ [] _                = return []
@@ -143,6 +150,24 @@ zipWith3M_ f [] _ _                 = return ()
 zipWith3M_ f _ [] _                 = return ()
 zipWith3M_ f _ _ []                 = return ()
 zipWith3M_ f (x:xs) (y:ys) (z:zs)   = f x y z >> zipWith3M_ f xs ys zs
+
+
+-- | Apply a monadic function to each element in a container.
+-- In theory speak, this is a class that identifies functors which
+-- distribute over all monads.
+class ForEach f where
+  forEach          :: Monad m => f a -> (a -> m b) -> m (f b)
+
+instance ForEach [] where
+  forEach xs f      = mapM f xs
+
+instance ForEach Maybe where
+  forEach Nothing f   = return Nothing
+  forEach (Just x) f  = Just # f x
+
+forEach_           :: (Monad m, ForEach f) => f a -> (a -> m b) -> m ()
+forEach_ xs f       = forEach xs f >> return ()
+
 
 
 
