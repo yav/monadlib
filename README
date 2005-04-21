@@ -1,7 +1,7 @@
 1.4 (18 April 2005):
   - Split the Monad.Prelude into multiple files: now we have extra files
     called Monad.Combinators and Monad.ForEach
-  - Added 'do<Effect>' functions to the monad prelude.  These make it easy to 
+  - Added 'in<Effect>' functions to the monad prelude.  These make it easy to 
     turn a pure representation of an effectful computation into an actual 
     computation.
   - Changes to Writer/WriterT:
