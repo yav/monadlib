@@ -34,7 +34,7 @@ instance Functor m => Functor (ReaderT r m) where
   fmap f (R m)      = R (\r -> fmap f (m r))
 
 instance Monad m => Monad (ReaderT r m) where
-  return a          = R (\r -> return a)
+  return a          = R (\_ -> return a)
   R m1 >>= k        = R (\r -> do a <- m1 r
                                   let R m2 = k a
                                   m2 r)

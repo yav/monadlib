@@ -26,7 +26,6 @@ module Monad.ContT
   ) where
 
 import Monad.Prelude
-import Control.Monad.Fix
 
 -- | Computations that return a value of type /a/, in prompt of type /o/
 -- and in the process can side-effect as described by /m/.

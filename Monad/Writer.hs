@@ -1,61 +1,48 @@
-
 module Monad.Writer 
   ( Writer, runWriter, evalWriter, execWriter
   , module Monad.Prelude
-  , module Monad.Monoid
   ) where
 
 import Monad.Prelude
 import Control.Monad.Fix
-
-import Monad.Reader
-import Monad.Monoid
-
+import Data.Monoid
 
 
 -- | A computation that computes a value of type /a/,
 -- and can write values to a buffer of type /w/.
-newtype Writer w a  = W (Reader (MonoidOn w) (a,w))
+newtype Writer w a  = W { unW :: (a,w) }
 
--- | Execute computation, getting its result and the collected output.
-runWriter          :: MonoidOn w -> Writer w a -> (a,w)
-runWriter d (W m)   = runReader d m
+-- | Execute computation, returning both its result and the collected output.
+runWriter          :: Writer w a -> (a,w)
+runWriter m         = unW m
 
 -- | Execute a computation, ignoring its output.
-evalWriter         :: MonoidOn w -> Writer w a -> a
-evalWriter d m      = fst (runWriter d m)
+evalWriter         :: Writer w a -> a
+evalWriter m        = fst (runWriter m)
 
 -- | Execute a computation just for the side effect.
-execWriter         :: MonoidOn w -> Writer w a -> w 
-execWriter d m      = snd (runWriter d m)
+execWriter         :: Writer w a -> w 
+execWriter m        = snd (runWriter m)
 
 
-instance Functor (Writer w) where
-  fmap f (W m)      = W (do ~(a,w) <- m
-                            return (f a,w)) 
+instance Monoid w => Functor (Writer w) where
+  fmap f m          = liftM f m
 
-instance Monad (Writer w) where
-  return a          = W (do none <- mUnit # get
-                            return (a,none))
-  W m1 >>= k        = W (do ~(a,w1) <- m1
-                            let W m2 = k a
-                            ~(b,w2) <- m2
-                            join    <- mJoin # get
-                            return (b, join w1 w2))
+instance Monoid w => Monad (Writer w) where
+  return a          = W (a,mempty)
+  W (a,w1) >>= k    = W (let (b,w2) = unW (k a)
+                             w      = w1 `mappend` w2
+                         in seq w (b,w))
 
-instance BaseM (Writer w) (Writer w) where inBase x = x
+instance Monoid w => BaseM (Writer w) (Writer w) where inBase x = x
 
-instance MonadFix (Writer w) where
-  mfix f            = W (mdo let W m = f (fst r)
-                             r <- m
-                             return r)
+instance Monoid w => MonadFix (Writer w) where
+  mfix f            = W (let r = unW (f (fst r)) in r)
 
-instance WriterM (Writer w) w where
-  put w             = W (return ((),w))
+instance Monoid w => WriterM (Writer w) w where
+  put w             = seq w (W ((),w))
 
-instance TakeWriterM (Writer w) w where
-  takeFrom (W m)    = W (do x <- m
-                            none <- mUnit # get
-                            return (x,none))
+instance Monoid w => TakeWriterM (Writer w) w where
+  takeFrom (W m)    = W (m,mempty)
 
 

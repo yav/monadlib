@@ -19,8 +19,7 @@ runReaderIn   = (runReader 3 $ findOne depthFirst $ testReader ()) >>= print
 
 
 -- | Test interaction of writers and backtracking.
-testReader    = (letLocal 7 mzero `mplus` get) >>= print
-testWriter    = ((put "hello" >> mzero) `mplus` put "world") >>= print
+testWriter () = ((put "hello" >> mzero) `mplus` put "world") 
 
 -- | Writer on the outside.
 runWriterOut  = (findOne depthFirst $ runWriter $ testWriter ()) >>= print

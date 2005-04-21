@@ -1,5 +1,6 @@
 -- | Implements the writer (aka output) transformer.
 -- Provides the ability to accumulate data in a buffer.
+-- This implementation is strict in the buffer.
 --
 -- * Commutes with: "Monad.ReaderT", "Monad.WriterT", "Monad.StateT"
 -- 
@@ -17,73 +18,62 @@ module Monad.WriterT
     -- $ContM
  
   WriterT, runWriter, evalWriter, execWriter, module Monad.Prelude
-  , module Monad.Monoid
   ) where
 
 import Monad.Prelude
 import Control.Monad.Fix
-
-import Monad.ReaderT
-import Monad.Monoid
+import Data.Monoid
 
 -- | A computation that computes a result of type /a/, may place items 
 -- in a buffer of type /w/, and can also side-effect as described by /m/.
-newtype WriterT w m a = W (ReaderT (MonoidOn w) m (a,w))
+newtype WriterT w m a = W { unW :: m (a,w) }
 
--- | Execute computation, getting its result and the collected output.
-runWriter          :: Monad m => MonoidOn w -> WriterT w m a -> m (a,w)
-runWriter d (W m)   = runReader d m
+-- | Execute a computation, returns both the result and the collected output.
+runWriter          :: WriterT w m a -> m (a,w)
+runWriter (W m)     = m
 
--- | Execute a computation, ignoring its output.
-evalWriter         :: Monad m => MonoidOn w -> WriterT w m a -> m a
-evalWriter d m     = fst # runWriter d m
+-- | Execute a computation, ignoring the output.
+evalWriter         :: Monad m => WriterT w m a -> m a
+evalWriter m        = fst # runWriter m
 
 -- | Execute a computation just for the side effect.
-execWriter          :: Monad m => MonoidOn w -> WriterT w m a -> m w
-execWriter d m       = snd # runWriter d m
+execWriter          :: Monad m => WriterT w m a -> m w
+execWriter m        = snd # runWriter m
 
 
-instance Monad m => Functor (WriterT w m) where
-  fmap f (W m)      = W (do ~(a,w) <- m
-                            return (f a, w))
+instance (Monoid w, Monad m) => Functor (WriterT w m) where
+  fmap f m          = liftM f m
 
-instance Monad m => Monad (WriterT w m) where
-  return a          = W (do none <- mUnit # get
-                            return (a,none))
-  W m >>= k         = W (do ~(a,w1) <- m
-                            let W m' = k a
-                            ~(b,w2) <- m'
-                            join <- mJoin # get
-                            return (b,w1 `join` w2))
+instance (Monoid w, Monad m) => Monad (WriterT w m) where
+  return a          = lift (return a)
+  W m >>= k         = W (do (a,w1) <- m
+                            (b,w2) <- unW (k a)
+                            let w = w1 `mappend` w2
+                            seq w (return (b,w)))
                         
-instance Trans (WriterT w) where
-  lift m            = W (do a <- lift m
-                            none <- mUnit # get
-                            return (a,none))
+instance Monoid w => Trans (WriterT w) where
+  lift m            = W (do a <- m
+                            return (a,mempty))
 
-instance BaseM m b => BaseM (WriterT w m) b where
+instance (Monoid w, BaseM m b) => BaseM (WriterT w m) b where
   inBase m          = lift (inBase m)
 
-instance MonadFix m => MonadFix (WriterT w m) where
-  mfix f            = W (mdo let W m = f (fst r) 
-                             r <- m
+instance (Monoid w, MonadFix m) => MonadFix (WriterT w m) where
+  mfix f            = W (mdo r <- unW (f (fst r))
                              return r)
                         
-instance ReaderM m r => ReaderM (WriterT w m) r where
+instance (Monoid w, ReaderM m r) => ReaderM (WriterT w m) r where
   get               = lift get
-  local f (W m)     = W (do mon <- get
-                            lift (local f (runReader mon m)))
+  local f (W m)     = W (local f m)
 
+instance (Monoid w, Monad m) => WriterM (WriterT w m) w where
+  put w             = W (seq w (return ((), w)))
 
-instance Monad m => WriterM (WriterT w m) w where
-  put w             = W (return ((), w))
-
-instance Monad m => TakeWriterM (WriterT w m) w where
+instance (Monoid w, Monad m) => TakeWriterM (WriterT w m) w where
   takeFrom (W m)    = W (do r <- m
-                            none <- mUnit # get
-                            return (r,none))
+                            return (r,mempty))
 
-instance StateM m s => StateM (WriterT w m) s where
+instance (Monoid w, StateM m s) => StateM (WriterT w m) s where
   peek              = lift peek
   poke s            = lift (poke s)
 
@@ -92,16 +82,16 @@ instance StateM m s => StateM (WriterT w m) s where
 -- Exceptions undo the output.
 --
 -- see: runWriterOut in <Examples/Except.hs>
-instance ExceptM m e => ExceptM (WriterT w m) e where
+instance (Monoid w, ExceptM m e) => ExceptM (WriterT w m) e where
   raise e           = lift (raise e)
-  handle (W m) h    = W (m `handle` (\e -> let W m' = h e in m'))
+  handle (W m) h    = W (m `handle` (\e -> unW (h e)))
 
 -- $BackM
 -- Backtracking undoes the output.  
 -- Another way to put this is that every alternative has its own output buffer.
 --
 -- see: runWriterOut in <Examples/Back.hs>
-instance MonadPlus m => MonadPlus (WriterT w m) where
+instance (Monoid w, MonadPlus m) => MonadPlus (WriterT w m) where
   mzero               = lift mzero
   mplus (W m1) (W m2) = W (m1 `mplus` m2)
 
@@ -110,12 +100,8 @@ instance MonadPlus m => MonadPlus (WriterT w m) where
 -- Jumping undoes changes to the output.
 --
 -- see: runWriterOut in <Examples/Cont.hs>
-instance ContM m => ContM (WriterT w m) where
-  callcc m          = W (callcc (\k -> 
-                           let W m' = m (\a -> W (do none <- mUnit # get
-                                                     k (a,none)))
-                           in m'))
-
+instance (Monoid w, ContM m) => ContM (WriterT w m) where
+  callcc m          = W (callcc (\k -> unW (m (\a -> W (k (a,mempty))))))
 
 
 

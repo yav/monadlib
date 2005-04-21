@@ -1,3 +1,15 @@
+1.4 (18 April 2005):
+  - Split the Monad.Prelude into multiple files: now we have extra files
+    called Monad.Combinators and Monad.ForEach
+  - Added 'do<Effect>' functions to the monad prelude.  These make it easy to 
+    turn a pure representation of an effectful computation into an actual 
+    computation.
+  - Changes to Writer/WriterT:
+    * We are back to using the Monoid class
+    * Now it is strict in the output
+    (the previous implementation was too inefficient)
+  
+
 1.3.1 (28 March 2005):
   - Made Monad.Writer and Monad.WriteT export the monoid library.
 

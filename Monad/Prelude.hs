@@ -1,6 +1,14 @@
-module Monad.Prelude (module Monad.Prelude, module Monad) where
+module Monad.Prelude 
+  ( module Monad.Prelude
+  , module Monad.Combinators
+  , module Monad.ForEach
+  ) where
 
-import Monad
+import Monad.Combinators
+import Monad.ForEach
+
+
+-- Monad transformers ----------------------------------------------------------
 
 -- | The class of monad transformers.
 class Trans t where
@@ -9,16 +17,17 @@ class Trans t where
   lift             :: Monad m => m a -> t m a
 
 
--- | Provides means to execute a computation in the base of
--- a tower of monads.
+-- | Provides means to execute a computation in the base of a tower of monads.
 class (Monad m, Monad b) => BaseM m b | m -> b where
   inBase           :: b a -> m a
 
-instance BaseM IO IO where inBase x = x
-instance BaseM [] [] where inBase x = x
-instance BaseM Maybe Maybe where inBase x = x
+instance BaseM IO IO        where inBase x = x
+instance BaseM [] []        where inBase x = x
+instance BaseM Maybe Maybe  where inBase x = x
 
 
+
+-- Monads with an environment --------------------------------------------------
 
 -- | Monads that provide access to a context.
 class Monad m => ReaderM m r | m -> r where
@@ -34,12 +43,27 @@ class Monad m => ReaderM m r | m -> r where
 letLocal           :: ReaderM m r => r -> m a -> m a
 letLocal r m        = local (\_ -> r) m         
 
+-- | Promote a function to a computation with an environment.
+-- The argument to the function is the environment.
+inReader           :: ReaderM m r => (r -> a) -> m a
+inReader f          = f # get
+
+
+
+-- Monads with an output -------------------------------------------------------
 
 -- | Monads that can perform output.
 class Monad m => WriterM m w | m -> w where
 
   -- | Add a value to the output.
   put              :: w -> m ()
+
+-- | Promote a pair to a computation with output.
+-- The first component is the result of the computation,
+-- while the second component is sent to the output.
+inWriter           :: WriterM m w => (a,w) -> m a
+inWriter ~(a,w)     = put w >> return a
+
 
 
 -- | Monads that can perform output, and it is possible to gather the output of a subcomputation. 
@@ -55,6 +79,7 @@ mapBuffer f m       = do ~(a,w) <- takeFrom m
                          return a 
 
 
+-- Stateful computations -------------------------------------------------------
 
 -- | Monads that can manipulate state.
 class Monad m => StateM m s | m -> s where
@@ -71,12 +96,24 @@ update f            = do x <- peek
                          poke (f x)
                          return x
 
+-- | Update the state, and dicard the old state.
 update_            :: StateM m s => (s -> s) -> m ()
 update_ f           = update f >> return ()
 
+-- | Set the state, without using the old state.
 poke_              :: StateM m s => s -> m ()
 poke_ s             = poke s >> return ()
 
+-- | Promote a state transformer function to a stateful computation.
+inState            :: StateM m s => (s -> (a,s)) -> m a
+inState f           = do s <- peek
+                         let (a,s') = f s
+                         poke s'
+                         return a
+
+
+
+-- Computations that may raise an exception ------------------------------------
 
 -- | Monads that can throw and catch exceptions.
 class Monad m => ExceptM m e | m -> e where
@@ -94,6 +131,27 @@ class Monad m => ExceptM m e | m -> e where
 handle_            :: ExceptM m e => m a -> m a -> m a
 handle_ m h         = m `handle` \_ -> h
 
+-- | Promote a value of type 'Either', to a computation that may fail.
+-- Values tagged with 'Left' are errors,
+-- while valies tagged with 'Right' succeed (because they are Right :-)
+inExcept           :: ExceptM m e => Either e a -> m a
+inExcept (Left err) = raise err
+inExcept (Right a)  = return a
+
+
+
+-- Back tracking computations --------------------------------------------------
+
+-- The interface to those is the standrad Haskell class 'MPlus'.
+
+-- | Promote a list value to a backtracking(non-deterministc) computation.
+-- The computation may succeed with any of the elements in the list. 
+inBack             :: MonadPlus m => [a] -> m a
+inBack as           = foldr mplus mzero (map return as)
+
+
+
+-- Computations that may refer to their continuation ---------------------------
 
 -- | Monads that allow for explicit handling of continuations.
 class Monad m => ContM m where
@@ -102,77 +160,4 @@ class Monad m => ContM m where
   callcc           :: ((a -> m b) -> m a) -> m a
 
 
--- | Like '(=<<'), but we need to compute to get the first function.
-(<##)              :: Monad m => m (a -> m b) -> m a -> m b
-mf <## mx           = do f <- mf
-                         x <- mx
-                         f x
-
-
--- | Like 'map', but we need to compute to get the first function.
-(<#)               :: Monad m => m (a -> b) -> m a -> m b
-mf <# mx            = do f <- mf
-                         x <- mx
-                         return (f x)
-
--- | A convenient name for 'map'.
-( # )              :: Monad m => (a -> b) -> m a -> m b
-f # mx              = do x <- mx
-                         return (f x)
-
--- | Kleisli composition.  Composes two effectful functions.
-(@@)               :: Monad m => (b -> m c) -> (a -> m b) -> (a -> m c)
-(g @@ f) x          = g =<< f x
-
-
-
--- | A monadic version of 'concatMap'.
-concatMapM         :: Monad m => (a -> m [b]) -> [a] -> m [b]
-concatMapM f        = liftM concat . mapM f
-
--- | A monadic version of 'partition'.
--- The test happens before checking the rest of the list.
-partitionM         :: Monad m => (a -> m Bool) -> [a] -> m ([a],[a])
-partitionM p []     = return ([],[])
-partitionM p (a:as) = do b <- p a 
-                         (xs,ys) <- partitionM   p as
-                         return (if b then (a:xs,ys) else (xs,a:ys))
-
--- | Combine 3 lists using a monadic funciton.
-zipWith3M          :: Monad m => (a -> b -> c -> m d) -> [a] -> [b] -> [c] -> m [d]
-zipWith3M f [] _ _                = return []
-zipWith3M f _ [] _                = return []
-zipWith3M f _ _ []                = return []
-zipWith3M f (x:xs) (y:ys) (z:zs)  = (:) # f x y z <# zipWith3M f xs ys zs
-
-zipWith3M_         :: Monad m => (a -> b -> c -> m d) -> [a] -> [b] -> [c] -> m ()
-zipWith3M_ f [] _ _                 = return ()
-zipWith3M_ f _ [] _                 = return ()
-zipWith3M_ f _ _ []                 = return ()
-zipWith3M_ f (x:xs) (y:ys) (z:zs)   = f x y z >> zipWith3M_ f xs ys zs
-
-
--- | Apply a monadic function to each element in a container.
--- In theory speak, this is a class that identifies functors which
--- distribute over all monads.
-class ForEach f where
-  forEach          :: Monad m => f a -> (a -> m b) -> m (f b)
-
-instance ForEach [] where
-  forEach xs f      = mapM f xs
-
-instance ForEach Maybe where
-  forEach Nothing f   = return Nothing
-  forEach (Just x) f  = Just # f x
-
-forEach_           :: (Monad m, ForEach f) => f a -> (a -> m b) -> m ()
-forEach_ xs f       = forEach xs f >> return ()
-
-
-
-
-
-
-                          
-                     
-
+-- doCont            :: ContM m => (forall o. (a -> o) -> o) -> m a

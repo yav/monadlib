@@ -24,7 +24,6 @@ module Monad.BackT
   
 import Monad.Prelude
 import Control.Monad.Fix
-import Control.Monad(MonadPlus(..))
 
 
 -- | A computation that can compute zero or more values of type /a/,
@@ -40,7 +39,7 @@ breadthFirst                        = T (\nil cons m -> bf' nil cons [m] [])
   where bf' nil cons (B m : q1) q2  = m (bf' nil cons q1 q2) 
                                         (\x -> cons x (bf' nil cons q1 q2)) 
                                         (\opt1 opt2 -> bf' nil cons q1 (opt2 : opt1 : q2))
-        bf' nil cons [] []          = nil
+        bf' nil    _ [] []          = nil
         bf' nil cons [] q           = bf' nil cons (reverse q) []
 
 
@@ -50,7 +49,7 @@ depthFirst                          = T (\nil cons m -> df' nil cons [m])
   where df' nil cons (B m : q)      = m (df' nil cons q) 
                                         (\x -> cons x (df' nil cons q)) 
                                         (\opt1 opt2 -> df' nil cons (opt1 : opt2 : q))
-        df' nil cons []             = nil
+        df' nil    _ []             = nil
 
 
 -- | Execute all alternatives to get all possible results, using the specified strategy.
@@ -74,19 +73,17 @@ findOne method m                    = traverse method nil cons m
 
 
 
-instance Functor (BackT m) where
-  fmap f (B m)      = B (\no yes ch -> m no 
-                                         (\a -> yes (f a))
-                                         (\opt1 opt2 -> ch (fmap f opt1) (fmap f opt2)))
+instance Monad m => Functor (BackT m) where
+  fmap f m          = liftM f m
 
-instance Monad (BackT m) where
-  return x          = B (\no yes ch -> yes x)
+instance Monad m => Monad (BackT m) where
+  return x          = lift (return x)
   B m >>= k         = B (\no yes ch -> m no 
                                          (\a -> let B m' = k a in m' no yes ch)
                                          (\opt1 opt2 -> ch (opt1 >>= k) (opt2 >>= k)))
 
 instance Trans BackT where
-  lift m            = B (\no yes ch -> yes =<< m)
+  lift m            = B (\_ yes _ -> yes =<< m)
 
 instance BaseM m b => BaseM (BackT m) b where
   inBase m          = lift (inBase m)
