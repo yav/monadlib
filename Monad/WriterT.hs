@@ -50,6 +50,7 @@ instance (Monoid w, Monad m) => Monad (WriterT w m) where
                             (b,w2) <- unW (k a)
                             let w = w1 `mappend` w2
                             seq w (return (b,w)))
+                            -- return (b,w))
                         
 instance Monoid w => Trans (WriterT w) where
   lift m            = W (do a <- m
@@ -68,6 +69,7 @@ instance (Monoid w, ReaderM m r) => ReaderM (WriterT w m) r where
 
 instance (Monoid w, Monad m) => WriterM (WriterT w m) w where
   put w             = W (seq w (return ((), w)))
+  -- put w             = W (return ((), w))
 
 instance (Monoid w, Monad m) => TakeWriterM (WriterT w m) w where
   takeFrom (W m)    = W (do r <- m
