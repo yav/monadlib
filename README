@@ -1,3 +1,6 @@
+1.4.1 (1 August 2005):
+  - Now the source code of the library does not use 'mdo', but 'mfix' instead.
+
 1.4 (18 April 2005):
   - Split the Monad.Prelude into multiple files: now we have extra files
     called Monad.Combinators and Monad.ForEach

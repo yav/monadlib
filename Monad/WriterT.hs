@@ -60,8 +60,7 @@ instance (Monoid w, BaseM m b) => BaseM (WriterT w m) b where
   inBase m          = lift (inBase m)
 
 instance (Monoid w, MonadFix m) => MonadFix (WriterT w m) where
-  mfix f            = W (mdo r <- unW (f (fst r))
-                             return r)
+  mfix f            = W (mfix (\r -> unW (f (fst r))))
                         
 instance (Monoid w, ReaderM m r) => ReaderM (WriterT w m) r where
   get               = lift get

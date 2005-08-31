@@ -54,15 +54,13 @@ instance BaseM m b => BaseM (ExceptT x m) b where
   inBase m          = lift (inBase m)
 
 instance MonadFix m => MonadFix (ExceptT x m) where
-  mfix f            = E (\ok fail -> mdo let E g = f a
-                                         ~(a,r) <- g (\a -> do r <- ok a
-                                                               return (a,r)
-                                                     ) 
-                                                     (\x -> do r <- fail x
-                                                               return (error "mfix looped",r)
-                                                     )
-                                         return r)
 
+  mfix f            = E (\ok fail -> do let ok' a   = do r <- ok a
+                                                         return (a,r)
+                                            fail' x = do r <- fail x
+                                                         return (error "mfix looped",r)
+                                        ~(_,r) <- mfix (\ ~(a,_) -> let E g = f a in g ok' fail')
+                                        return r)
 
 -- $ReaderM
 -- Exceptions are handled in the context in which the exception was risen.

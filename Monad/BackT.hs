@@ -89,14 +89,15 @@ instance BaseM m b => BaseM (BackT m) b where
   inBase m          = lift (inBase m)
 
 instance MonadFix m => MonadFix (BackT m) where
-  mfix f            = B (\no yes ch -> mdo let B m = f a 
-                                           ~(a,r) <- m (do r <- no
-                                                           return (error "BackT: mfix looped -- no", r))
-                                                       (\a -> do r <- yes a
-                                                                 return (a,r))
-                                                       (\_ _ -> do r <- ch (mfix (left . f)) (mfix (right . f))
-                                                                   return (error "BackT: mfix looped -- choice", r))
-                                           return r)
+  mfix f            = B (\no yes ch -> do let no'     = do r <- no
+                                                           return (error "BackT: mfix looped -- no", r)
+                                              yes' a  = do r <- yes a
+                                                           return (a,r)
+                                              ch' _ _ = do r <- ch (mfix (left . f)) (mfix (right . f))
+                                                           return (error "BackT: mfix looped -- choice", r)
+
+                                          ~(_,r) <- mfix (\ ~(a,_) -> let B m = f a in m no' yes' ch')
+                                          return r)
 
     where left (B m)  = B (\no yes ch -> m (error "BackT: mfix looped -- left -> no")
                                            (error "BackT: mfix looped -- left -> yes")

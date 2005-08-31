@@ -1,5 +1,5 @@
 Name:           monadLib
-Version:        1.4
+Version:        1.4.1
 License:        BSD3
 Author:         Iavor S. Diatchki
 Homepage:       http://www.cse.ogi.edu/~diacthki/monadLib
@@ -13,7 +13,6 @@ Exposed-modules:
   Monad.ContT,   Monad.Monoid,   Monad.State,
   Monad.Except,  Monad.StateT
 Extensions:     
-  RecursiveDo, MultiParamTypeClasses, FunctionalDependencies,
-  PolymorphicComponents 
+  MultiParamTypeClasses, FunctionalDependencies, PolymorphicComponents 
 GHC-options:    -O2 -W
 
