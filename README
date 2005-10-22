@@ -1,3 +1,14 @@
+1.5 (28 September 2005)
+  - Changed BackT to SearchT, and changed the interface for searching.
+  - Removed the monads (too much to maintain, little use?), just left the 
+    transformers.  The monads can be obtained by transforming the
+    monad, e.g. Reader = ReaderT Id
+  - Much imprved Examples directory
+  - Some changes to strictness behavior. Guiding principle: 
+    we are strict in internal structures, 
+    (e.g., pair for the state and result), but not in the values 
+    (e.g., the actual state).
+
 1.4.1 (1 August 2005):
   - Now the source code of the library does not use 'mdo', but 'mfix' instead.
 

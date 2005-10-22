@@ -1,5 +1,5 @@
 Name:           monadLib
-Version:        1.4.1
+Version:        1.5
 License:        BSD3
 Author:         Iavor S. Diatchki
 Homepage:       http://www.cse.ogi.edu/~diacthki/monadLib
@@ -7,11 +7,9 @@ Category:       Monads
 Build-Depends:  base
 Synopsis:       A collection of monads
 Exposed-modules:
-  Monad.Combinators, Monad.ForEach, Monad.Prelude,
-  Monad.BackT,   Monad.ExceptT,  Monad.Reader,   Monad.Writer,
-  Monad.Cont,    Monad.Id,       Monad.ReaderT,  Monad.WriterT,
-  Monad.ContT,   Monad.Monoid,   Monad.State,
-  Monad.Except,  Monad.StateT
+  Monad.Combinators, Monad.ForEach, Monad.Prelude, Monad.Id, 
+  Monad.ReaderT,  Monad.WriterT, Monad.StateT,
+  Monad.ExceptT, Monad.SearchT, Monad.ContT
 Extensions:     
   MultiParamTypeClasses, FunctionalDependencies, PolymorphicComponents 
 GHC-options:    -O2 -W

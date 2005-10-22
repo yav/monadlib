@@ -19,8 +19,8 @@ module Monad.ContT
     -- ** instance ExceptM
     -- $ExceptM
 
-    -- ** instance BackM
-    -- $BackM
+    -- ** instance SearchM
+    -- $SearchM
 
   ContT, runCont, shift, reset, module Monad.Prelude
   ) where
@@ -64,7 +64,7 @@ instance BaseM m b => BaseM (ContT o m) b where
 -- of a jump would be the same as the context at the source of the jump.
 -- This is similar to dynamic scoping.
 --
--- see: runReaderIn in <Examples/Cont.hs>
+-- see: <Examples/Cont/Reader.hs>
 instance ReaderM m r => ReaderM (ContT o m) r where
   get               = lift get
   local f (C m)     = C (\k -> local f (m k))
@@ -73,7 +73,7 @@ instance ReaderM m r => ReaderM (ContT o m) r where
 -- Jumping does not affect the output, that is every time we go past
 -- a part of the program that has output, we add this output to the buffer.
 --
--- see: runWriterIn in <Examples/Cont.hs>
+-- see: <Examples/Cont/Writer.hs>
 instance WriterM m w => WriterM (ContT o m) w where
   put o             = lift (put o)
 
@@ -81,7 +81,7 @@ instance WriterM m w => WriterM (ContT o m) w where
 -- Jumping does not affect the state, that is every time we execute a part
 -- of the program that modifies the state, it will modified.
 -- 
--- see: runStateIn in <Examples/Cont.hs>
+-- see: <Examples/Cont/State.hs>
 instance StateM m s => StateM (ContT o m) s where
   peek              = lift peek
   poke s            = lift (poke s)
@@ -92,11 +92,18 @@ instance ExceptM m x => ExceptM (ContT o m) x where
   raise x           = lift (raise x)
   handle (C m) h    = C (\k -> handle (m k) (\x -> let C m' = h x in m' k))
 
--- $BackM
+-- $SearchM
 -- TODO: What is going on here?
 instance MonadPlus m => MonadPlus (ContT o m) where
-  mzero                 = lift mzero
+  mzero             = lift mzero
   mplus (C m1) (C m2)   = C (\k -> m1 k `mplus` m2 k)
+
+instance SearchM m => SearchM (ContT o m) where
+  force (C m)       = C (\k -> force (m k))
+  findOne _         = error "ContT: findOne not yet implemented."
+  -- XXX: 
+  -- findOne (C m)         = C (\k -> do x <- findOne (m 
+  
 
 instance ContM (ContT o m) where
   callcc f          = C (\k -> let C m = f (\a -> C (\_ -> k a)) in m k)

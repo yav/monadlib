@@ -11,6 +11,6 @@ hugs:
 	runhaskell Setup.hs haddock
 
 install:
-	sudo runhaskell Setup.hs install
+	runhaskell Setup.hs install
 
 

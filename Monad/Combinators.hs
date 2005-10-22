@@ -1,6 +1,6 @@
-module Monad.Combinators (module Monad.Combinators, module Monad) where
+module Monad.Combinators (module Monad.Combinators, module Control.Monad) where
 
-import Monad
+import Control.Monad
 
 -- | Like '(=<<'), but we need to compute to get the first function.
 (<##)              :: Monad m => m (a -> m b) -> m a -> m b

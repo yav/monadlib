@@ -7,6 +7,7 @@ module Monad.Prelude
 import Monad.Combinators
 import Monad.ForEach
 
+version             = (1,5,1)
 
 -- Monad transformers ----------------------------------------------------------
 
@@ -66,7 +67,8 @@ inWriter ~(a,w)     = put w >> return a
 
 
 
--- | Monads that can perform output, and it is possible to gather the output of a subcomputation. 
+-- | Monads that can perform output, 
+-- and it is possible to gather the output of a subcomputation. 
 class WriterM m w => TakeWriterM m w | m -> w where
   takeFrom         :: m a -> m (a,w)
 
@@ -140,14 +142,80 @@ inExcept (Right a)  = return a
 
 
 
--- Back tracking computations --------------------------------------------------
+-- Searching --------------------------------------------------------------------
 
--- The interface to those is the standrad Haskell class 'MPlus'.
+-- The interface is based on the standrad Haskell class 'MPlus':
+--  * 'mzero' is a computation that produces no results,
+--  * 'mplus m1 m2' is a computation that contains the result of 'm1' and 'm2'.
+-- The execution of 'mplus m1 m2' interleaves the evaluation of 'm1' and 'm2'.
+-- The evaluation starts with 'm1'.  "Context switching" occurs at choice
+-- points, introduced by 'mplus', or '<+'.
+
+class MonadPlus m => SearchM m where
+  force            :: m a -> m a
+  -- ^ Commit to an alternative.
+  -- While searching, no other choices will be tried until
+  -- the computation fails, or finds a result.
+
+  findOne          :: m a -> m (Maybe (a,m a)) 
+  -- ^ Look for an answer.  Produces exactly one answer.
+  -- The answer is 'Nothing' if the argument computation fails.
+  -- Otherwise the result contains a solution, and a computation that
+  -- may be used to get more solutions.
+
+
+-- | Biased choice.  Prefer the left component.
+(<+)               :: SearchM m => m a -> m a -> m a
+m1 <+ m2            = force m1 `mplus` m2  
+
+-- | Biased choice.  Prefer the right component.
+(+>)               :: SearchM m => m a -> m a -> m a
+m1 +> m2            = m2 <+ m1
+
+
+-- | Find all possible answers of a computation.
+-- The answers are reversed, i.e. the first element of the result is the last 
+-- answer that was found.
+findAll            :: SearchM m => m a -> m [a]
+findAll m           = loop [] m
+  where
+  loop xs m         = do x <- findOne m 
+                         case x of
+                           Nothing    -> return xs
+                           Just (x,m) -> loop (x:xs) m
+
+-- | Search for all answers, but only for the side-effects.
+findAll_           :: SearchM m => m a -> m ()
+findAll_ m          = loop m
+  where
+  loop m            = do x <- findOne m
+                         case x of 
+                           Nothing    -> return ()
+                           Just (_,m) -> loop m 
+
+
+-- | Find a given number of answers.  
+-- If there were not enough answers, the second part of the result is 'Nothing'.
+-- Otherwise the second part of the result contains a computation that may
+-- be used to get more answers.
+-- The answers are reversed, i.e. the first element of the result is the last 
+-- answer that was found.
+findN              :: SearchM m => Int -> m a -> m ([a], Maybe (m a))
+findN n m           = loop [] n m
+  where
+  loop xs n m
+    | n <= 0        = return (xs,Just m)
+    | otherwise     = do x <- findOne m
+                         case x of
+                           Nothing -> return (xs,Nothing)
+                           Just (x,m) -> loop (x:xs) (n-1) m
+
+
 
 -- | Promote a list value to a backtracking(non-deterministc) computation.
 -- The computation may succeed with any of the elements in the list. 
-inBack             :: MonadPlus m => [a] -> m a
-inBack as           = foldr mplus mzero (map return as)
+inSearch           :: MonadPlus m => [a] -> m a
+inSearch as         = foldr mplus mzero (map return as)
 
 
 

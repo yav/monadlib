@@ -16,10 +16,10 @@ module Monad.ExceptT
     -- ** instance StateM
     -- $StateM
 
-    -- ** instance BackM
-    -- $BackM
+    -- ** instance SearchM
+    -- $SearchM
 
-  ExceptT, runExcept, module Monad.Prelude
+  ExceptT, runExcept, unsafeRunExcept, module Monad.Prelude
   ) where
 
 import Monad.Prelude
@@ -36,6 +36,9 @@ newtype ExceptT x m a = E (forall r. (a -> m r) -> (x -> m r) -> m r)
 runExcept          :: Monad m => ExceptT x m a -> m (Either x a)
 runExcept (E f)     = f (return . Right) (return . Left)
 
+
+unsafeRunExcept    :: Monad m => ExceptT x m a -> m a
+unsafeRunExcept (E m) = m return (\_ -> error "unsafeRunExcept: exception.")
 
 
 instance Functor (ExceptT x m) where
@@ -65,7 +68,7 @@ instance MonadFix m => MonadFix (ExceptT x m) where
 -- $ReaderM
 -- Exceptions are handled in the context in which the exception was risen.
 --
--- see: runReaderIn in <Examples/Except.hs>
+-- see: runReaderIn in <Examples/Except/Reader.hs>
 instance ReaderM m r => ReaderM (ExceptT x m) r where
   get               = lift get
   local f (E m)     = E (\ok fail -> local f (m ok fail))
@@ -74,7 +77,7 @@ instance ReaderM m r => ReaderM (ExceptT x m) r where
 -- $WriterM
 -- Raising an exception does not affect the output.
 --
--- see: runWriterIn <Examples/Except.hs>
+-- see: runWriterIn <Examples/Except/Writer.hs>
 instance WriterM m o => WriterM (ExceptT x m) o where
   put o             = lift (put o)
 
@@ -83,7 +86,7 @@ instance WriterM m o => WriterM (ExceptT x m) o where
 -- $StateM
 -- Raising an exception does not affect the state.
 --
--- see: runStateIn in <Examples/Except.hs>
+-- see: runStateIn in <Examples/Except/State.hs>
 instance StateM m s => StateM (ExceptT x m) s where
   peek              = lift peek
   poke s            = lift (poke s)
@@ -94,13 +97,43 @@ instance ExceptM (ExceptT x m) x where
                                                  in g ok fail))
 
 
--- $BackM
--- Raising an exception in one alternative does not prevent other alternatives form executing.
+-- $SearchM
+-- Raising an exception in one alternative does not prevent other 
+-- alternatives form executing.
 --
--- see: runBackExceptOut in <Examples/Control.hs>
+-- see: <Examples/Except/Search>
 instance MonadPlus m => MonadPlus (ExceptT x m) where
   mzero             = E (\_ _ -> mzero)
   mplus (E f) (E g) = E (\ok fail -> f ok fail `mplus` g ok fail)
+
+instance SearchM m => SearchM (ExceptT x m) where
+  force (E f)       = E (\ok fail -> force (f ok fail))
+
+
+  findOne m         = E (\ok fail -> 
+                          do mr <- findOne (fromCont m)
+                             case mr of
+                               Nothing -> ok Nothing
+                               Just (r,m) ->
+                                 case r of
+                                   -- Left x -> fail x
+                                   Left _ -> let E x = findOne (toCont m)
+                                             in x ok fail
+                                   Right a -> ok (Just (a, toCont m)))
+    where
+    fromCont (E m)  = m (return . Right) (return . Left)
+    toCont m        = E (\ok fail -> 
+                        do x <- m 
+                           case x of
+                             Left x -> fail x
+                             Right a -> ok a)
+
+-- XXX
+instance ContM m => ContM (ExceptT x m) where
+  callcc            = error "Except on top of Cont not yet implemented"
+
+                                                
+  
 
 
 

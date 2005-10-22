@@ -1,6 +1,6 @@
 module Monad.ForEach where
 
-import Monad
+import Control.Monad
 
 -- | Apply a monadic function to each element in a container.
 -- In theory speak, this is a class that identifies functors which

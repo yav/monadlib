@@ -1,6 +1,7 @@
 -- | Implements the writer (aka output) transformer.
 -- Provides the ability to accumulate data in a buffer.
--- This implementation is strict in the buffer.
+-- This implementation is strict in the buffer,
+-- but not the values that are stored in it.
 --
 -- * Commutes with: "Monad.ReaderT", "Monad.WriterT", "Monad.StateT"
 -- 
@@ -11,8 +12,8 @@ module Monad.WriterT
     -- ** instance ExceptM
     -- $ExceptM
 
-    -- ** instance BackM 
-    -- $BackM
+    -- ** instance SearchM 
+    -- $SearchM
 
     -- ** instance ContM
     -- $ContM
@@ -67,8 +68,8 @@ instance (Monoid w, ReaderM m r) => ReaderM (WriterT w m) r where
   local f (W m)     = W (local f m)
 
 instance (Monoid w, Monad m) => WriterM (WriterT w m) w where
-  put w             = W (seq w (return ((), w)))
-  -- put w             = W (return ((), w))
+  -- put w             = W (seq w (return ((), w)))
+  put w             = W (return ((), w))
 
 instance (Monoid w, Monad m) => TakeWriterM (WriterT w m) w where
   takeFrom (W m)    = W (do r <- m
@@ -82,25 +83,31 @@ instance (Monoid w, StateM m s) => StateM (WriterT w m) s where
 -- $ExceptM
 -- Exceptions undo the output.
 --
--- see: runWriterOut in <Examples/Except.hs>
+-- see: <Examples/Writer/Except.hs>
 instance (Monoid w, ExceptM m e) => ExceptM (WriterT w m) e where
   raise e           = lift (raise e)
   handle (W m) h    = W (m `handle` (\e -> unW (h e)))
 
--- $BackM
+-- $SearchM
 -- Backtracking undoes the output.  
 -- Another way to put this is that every alternative has its own output buffer.
 --
--- see: runWriterOut in <Examples/Back.hs>
+-- see: <Examples/Writer/Search.hs>
 instance (Monoid w, MonadPlus m) => MonadPlus (WriterT w m) where
   mzero               = lift mzero
   mplus (W m1) (W m2) = W (m1 `mplus` m2)
 
-
+instance (Monoid w, SearchM m) => SearchM (WriterT w m) where
+  force (W m)         = W (force m)
+  findOne (W m)       = W (up # findOne m)
+    where
+    up Nothing          = (Nothing, mempty)
+    up (Just ((a,w),m)) = (Just (a,W m),w)
+                                
 -- $ContM
 -- Jumping undoes changes to the output.
 --
--- see: runWriterOut in <Examples/Cont.hs>
+-- see: <Examples/Writer/Cont.hs>
 instance (Monoid w, ContM m) => ContM (WriterT w m) where
   callcc m          = W (callcc (\k -> unW (m (\a -> W (k (a,mempty))))))
 

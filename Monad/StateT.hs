@@ -3,15 +3,15 @@
 --
 -- * Commutes with: "Monad.ReaderT", "Monad.WriterT", "Monad.StateT"
 -- 
--- * Does not commute with: "Monad.ExceptT", "Monad.BackT", "Monad.ContT"
+-- * Does not commute with: "Monad.ExceptT", "Monad.SearchT", "Monad.ContT"
 module Monad.StateT 
   ( -- * Instance notes
 
     -- ** instance ExceptM
     -- $ExceptM
 
-    -- ** instance BackM
-    -- $BackM
+    -- ** instance SearchM
+    -- $SearchM
 
     -- ** instance ContM
     -- $ContM
@@ -46,11 +46,11 @@ execState s m       = fmap snd (runState s m)
 
 
 instance Functor m => Functor (StateT s m) where
-  fmap f (S m)      = S (\s -> fmap (\ ~(a,s1) -> (f a, s1)) (m s))
+  fmap f (S m)      = S (\s -> fmap (\ (a,s1) -> (f a, s1)) (m s))
 
 instance Monad m => Monad (StateT s m) where
   return a          = S (\s -> return (a,s))
-  S m1 >>= k        = S (\s -> do ~(a,s1)  <- m1 s
+  S m1 >>= k        = S (\s -> do (a,s1)  <- m1 s
                                   let S m2  = k a
                                   m2 s1)
 
@@ -70,7 +70,7 @@ instance ReaderM m r => ReaderM (StateT s m) r where
   get               = lift get
   local f m         = do s <- peek
                          let m' = runState s m
-                         ~(a,s) <- lift (local f m')
+                         (a,s) <- lift (local f m')
                          poke s
                          return a
 
@@ -80,7 +80,7 @@ instance WriterM m w => WriterM (StateT s m) w where
 instance TakeWriterM m w => TakeWriterM (StateT s m) w where
   takeFrom m        = do s <- peek
                          let m' = runState s m
-                         ~(~(a,s'),o) <- lift (takeFrom m')
+                         ((a,s'),o) <- lift (takeFrom m')
                          poke s'
                          return (a,o)
 
@@ -92,36 +92,54 @@ instance Monad m => StateM (StateT s m) s where
 -- $ExceptM
 -- Raising an exception undoes changes to the state.
 --
--- see: runStateOut in <Examples/Except.hs>
+-- see: <Examples/State/Except.hs>
 instance ExceptM m e => ExceptM (StateT s m) e where
   raise e           = lift (raise e)
   handle m h        = do s <- peek
                          let m'   = runState s m
                              h' e = runState s (h e)
-                         ~(a,s) <- lift (handle m' h')
+                         (a,s) <- lift (handle m' h')
                          poke s
                          return a
 
 
--- $BackM
+-- $SearchM
 -- Backtracking undoes changes to the state.
 -- Another way to put this is that every alternative has its own heap.
 --
--- see: runStateOut in <Examples/Back.hs>
+-- see: <Examples/State/Search.hs>
 instance MonadPlus m => MonadPlus (StateT s m) where
   mzero             = lift mzero
   mplus m1 m2       = do s <- peek
                          let m1' = runState s m1
                              m2' = runState s m2
-                         ~(a,s') <- lift (mplus m1' m2')
+                         (a,s') <- lift (mplus m1' m2')
                          poke s'
                          return a
+
+instance SearchM m => SearchM (StateT s m) where
+  force m           = do s <- peek
+                         (a,s') <- lift (force (runState s m))
+                         poke s'
+                         return a
+
+  findOne m         = do s <- peek
+                         let m' = runState s m
+                         x <- lift (findOne m')
+                         case x of
+                           Nothing -> return Nothing
+                           Just ((a,s),m) -> 
+                             do poke s
+                                return (Just (a, S (\_ -> m)))
+
+
+                         
 
 
 -- $ContM
 -- Jumping undoes changes to the state.
 --
--- see: runStateOut in <Examples/Cont.hs>
+-- see: <Examples/State/Cont.hs>
 instance ContM m => ContM (StateT s m) where
   callcc m          = S (\s -> callcc (\k -> let S m' = m (\a -> lift (k (a,s)))
                                              in m' s))
