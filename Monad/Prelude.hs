@@ -226,6 +226,17 @@ class Monad m => ContM m where
 
   -- | Capture the current continuation.
   callcc           :: ((a -> m b) -> m a) -> m a
+  -- callcc           :: (Cont m a -> m a) -> m a
+
+
+
+newtype Cont m a    = Cont { jump :: forall b. a -> m b }
+
+
 
 
 -- doCont            :: ContM m => (forall o. (a -> o) -> o) -> m a
+
+
+
+

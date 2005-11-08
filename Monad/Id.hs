@@ -1,5 +1,5 @@
 -- | The identity monad.
-module Monad.Id (Id, run, module Monad.Prelude) where
+module Monad.Id (Id, runId, module Monad.Prelude) where
 
 import Monad.Prelude
 import Control.Monad.Fix
@@ -8,8 +8,8 @@ import Control.Monad.Fix
 newtype Id a        = Id a
 
 -- | Run a computation.
-run                :: Id a -> a
-run (Id a)          = a
+runId              :: Id a -> a
+runId (Id a)        = a
 
 instance Functor Id where
   fmap f (Id a)     = Id (f a)

@@ -25,13 +25,13 @@ reader_search       = do x <- findOne (printEnv "e1" `mplus` printEnv "e2")
                      
 -- | Interaction of readers and continuations.
 reader_cont        :: (ReaderM m Int, ContM m, BaseM m IO) => m ()
-reader_cont         = do x <- callcc $ \k -> return (One k) 
+reader_cont         = do x <- callcc $ \k -> return (GoOn k) 
                          printEnv "e1"
                          case x of
-                           One k  -> letLocal 43
+                           GoOn k -> letLocal 43
                                        $ do printEnv "e2"
-                                            k Two
-                           Two    -> return ()
+                                            k Stop
+                           Stop   -> return ()
 
                                 
 -- | Interaction of writers and exceptions.
@@ -62,12 +62,12 @@ writer_search       = do put [1]
 -- | Interaction of writers and continuations.
 writer_cont        :: (WriterM m [Int], ContM m, BaseM m IO) => m ()
 writer_cont         = do put [1]
-                         x <- callcc $ \k -> return (One k) 
+                         x <- callcc $ \k -> return (GoOn k) 
                          put [2]
                          case x of
-                           One k  -> do put [3]
-                                        k Two
-                           Two    -> return ()
+                           GoOn k -> do put [3]
+                                        k Stop
+                           Stop   -> return ()
 
 
 -- | Interaction of state and exceptions.
@@ -91,15 +91,30 @@ state_search        = do x <- findOne (printSt "e1" `mplus` printSt "e2")
 -- | Interaction of state and continuations.
 state_cont         :: (StateM m Int, ContM m, BaseM m IO) => m ()
 state_cont          = do printSt "e1"
-                         x <- callcc $ \k -> printSt "e2" >> return (One k) 
+                         x <- callcc $ \k -> printSt "e2" >> return (GoOn k) 
                          printSt "e3"
                          case x of
-                           One k  -> do printSt "e4"
-                                        k Two
-                           Two    -> return ()
+                           GoOn k -> do printSt "e4"
+                                        k Stop
+                           Stop   -> return ()
+
+except_cont        :: (ExceptM m Int, ContM m, BaseM m IO) => m ()
+except_cont         = do x <- return 0 `handle` \x -> return (x+1)
+                         raise x
+
+except_cont'       :: (ExceptM m Int, ContM m, BaseM m IO) => m ()
+except_cont'        = do x <- callcc (\k -> pr "callcc" >> return (GoOn k))
+                              `handle` \_ -> do pr "handler" 
+                                                return (GoOn (\_ -> return ()))
+                         case x of
+                           GoOn k -> pr "GoOn" >> k Stop
+                           Stop   -> pr "Stop"  >> raise 0
+
 
 
 -- Utilities used by the examples ----------------------------------------------
+
+pr x                = inBase (putStrLn x)
 
 -- | For testing readers.
 printEnv           :: (ReaderM m Int, BaseM m IO) => String -> m ()
@@ -117,8 +132,10 @@ printSt msg         = do e <- peek
                          poke_ (e+1)
 
 -- | For testing continuations
-data K m            = One (K m -> m ())
-                    | Two
+data K m            = GoOn (K m -> m ())
+                    | Stop
+
+
 
 
 

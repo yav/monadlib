@@ -167,8 +167,15 @@ instance Monad m => SearchM (SearchT m) where
   force m           = B (\c -> forceK c m)
   findOne m         = lift (runSearch m)
 
+toCont             :: Monad m => m (Maybe (a,SearchT m a)) -> SearchT m a
+toCont m            = B (\c -> do x <- m  
+                                  case x of
+                                    Nothing -> failK c 
+                                    Just (a,m) -> choiceK c (return a) m)
 
--- XXX: Do continuations
+instance ContM m => ContM (SearchT m) where
+  callcc f          = toCont    $ callcc $ \k -> 
+                      runSearch $ f      $ \a -> lift (k (Just (a,mzero)))
 
 
 

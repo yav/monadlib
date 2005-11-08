@@ -68,7 +68,7 @@ instance MonadFix m => MonadFix (ExceptT x m) where
 -- $ReaderM
 -- Exceptions are handled in the context in which the exception was risen.
 --
--- see: runReaderIn in <Examples/Except/Reader.hs>
+-- see: <Examples/Except/Reader.hs>
 instance ReaderM m r => ReaderM (ExceptT x m) r where
   get               = lift get
   local f (E m)     = E (\ok fail -> local f (m ok fail))
@@ -77,7 +77,7 @@ instance ReaderM m r => ReaderM (ExceptT x m) r where
 -- $WriterM
 -- Raising an exception does not affect the output.
 --
--- see: runWriterIn <Examples/Except/Writer.hs>
+-- see: <Examples/Except/Writer.hs>
 instance WriterM m o => WriterM (ExceptT x m) o where
   put o             = lift (put o)
 
@@ -86,7 +86,7 @@ instance WriterM m o => WriterM (ExceptT x m) o where
 -- $StateM
 -- Raising an exception does not affect the state.
 --
--- see: runStateIn in <Examples/Except/State.hs>
+-- see: <Examples/Except/State.hs>
 instance StateM m s => StateM (ExceptT x m) s where
   peek              = lift peek
   poke s            = lift (poke s)
@@ -111,7 +111,7 @@ instance SearchM m => SearchM (ExceptT x m) where
 
 
   findOne m         = E (\ok fail -> 
-                          do mr <- findOne (fromCont m)
+                          do mr <- findOne (runExcept m)
                              case mr of
                                Nothing -> ok Nothing
                                Just (r,m) ->
@@ -120,22 +120,15 @@ instance SearchM m => SearchM (ExceptT x m) where
                                    Left _ -> let E x = findOne (toCont m)
                                              in x ok fail
                                    Right a -> ok (Just (a, toCont m)))
-    where
-    fromCont (E m)  = m (return . Right) (return . Left)
-    toCont m        = E (\ok fail -> 
-                        do x <- m 
-                           case x of
-                             Left x -> fail x
-                             Right a -> ok a)
 
--- XXX
+
+toCont             :: Monad m => m (Either x a) -> ExceptT x m a
+toCont m            = inExcept =<< lift m
+
 instance ContM m => ContM (ExceptT x m) where
-  callcc            = error "Except on top of Cont not yet implemented"
-
-                                                
+  callcc f          = toCont    $ callcc $ \k -> 
+                      runExcept $ f      $ \a -> lift (k (Right a))
   
-
-
 
 
                     

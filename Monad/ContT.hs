@@ -87,16 +87,16 @@ instance StateM m s => StateM (ContT o m) s where
   poke s            = lift (poke s)
 
 -- $ExceptM
--- TODO: What is going on here?
+-- Raising an exception cancels the continuation.
 instance ExceptM m x => ExceptM (ContT o m) x where
   raise x           = lift (raise x)
   handle (C m) h    = C (\k -> handle (m k) (\x -> let C m' = h x in m' k))
 
 -- $SearchM
--- TODO: What is going on here?
+-- 'mplus' shares the continuation, 'mzero' ignores it.
 instance MonadPlus m => MonadPlus (ContT o m) where
-  mzero             = lift mzero
-  mplus (C m1) (C m2)   = C (\k -> m1 k `mplus` m2 k)
+  mzero               = lift mzero
+  mplus (C m1) (C m2) = C (\k -> m1 k `mplus` m2 k)
 
 instance SearchM m => SearchM (ContT o m) where
   force (C m)       = C (\k -> force (m k))
