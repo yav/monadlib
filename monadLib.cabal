@@ -2,10 +2,13 @@ Name:           monadLib
 Version:        1.5
 License:        BSD3
 Author:         Iavor S. Diatchki
-Homepage:       http://www.cse.ogi.edu/~diacthki/monadLib
+Maintainer:     diatchki@csee.ogi.edu
+Homepage:       http://www.csee.ogi.edu/~diacthki/monadLib
 Category:       Monads
+Synopsis:       A collection of monad transformers
 Build-Depends:  base
-Synopsis:       A collection of monads
+Extra-source-files: 
+  README, INSTALL, Examples/Common.hs 
 Exposed-modules:
   Monad.Combinators, Monad.ForEach, Monad.Prelude, Monad.Id, 
   Monad.ReaderT,  Monad.WriterT, Monad.StateT,

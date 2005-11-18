@@ -1,3 +1,6 @@
+1.5 (09 November 2005)
+  - New monadic combinators: forEach2 = zipWithM, forEach3 = zipWithM3
+
 1.5 (28 September 2005)
   - Changed BackT to SearchT, and changed the interface for searching.
   - Removed the monads (too much to maintain, little use?), just left the 

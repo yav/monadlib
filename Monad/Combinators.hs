@@ -40,6 +40,14 @@ partitionM p (a:as) = do b <- p a
                          (xs,ys) <- partitionM   p as
                          return (if b then (a:xs,ys) else (xs,a:ys))
 
+
+forEach2           :: Monad m => [a] -> [b] -> (a -> b -> m c) -> m [c]
+forEach2 xs ys f    = zipWithM f xs ys
+
+forEach3           :: Monad m 
+                   => [a] -> [b] -> [c] -> (a -> b -> c -> m d) -> m [d]
+forEach3 xs ys zs f = zipWith3M f xs ys zs
+
 -- | Combine 3 lists using a monadic funciton.
 zipWith3M          :: Monad m => 
                       (a -> b -> c -> m d) -> [a] -> [b] -> [c] -> m [d]
