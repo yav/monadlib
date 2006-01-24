@@ -1,4 +1,5 @@
-
+1.5 (24 Jan 2006)
+  - New monadic combinators: andM, orM 
 
 1.5 (09 November 2005)
   - New monadic combinators: forEach2 = zipWithM, forEach3 = zipWithM3
