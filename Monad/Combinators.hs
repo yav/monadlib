@@ -28,6 +28,14 @@ f # mx              = do x <- mx
 whenM              :: Monad m => m Bool -> m () -> m ()
 whenM mb m          = (`when` m) =<< mb 
 
+andM, orM          :: Monad m => m Bool -> m Bool -> m Bool
+andM mx my          = do x <- mx
+                         if x then my else return False
+
+orM mx my           = do x <- mx
+                         if x then return True else my
+
+
 -- | A monadic version of 'concatMap'.
 concatMapM         :: Monad m => (a -> m [b]) -> [a] -> m [b]
 concatMapM f        = liftM concat . mapM f
