@@ -1,3 +1,10 @@
+                      = Quick Start =
+
+If you do not feel like installing the library as a package, you may
+simply copy the directory 'Monad' into your current project, or 
+tell your Haskell implementation where to find its source.
+
+
                       = Building the Library =
 
 The library may be installed using the (more or less) standard Cabal method.
@@ -14,7 +21,7 @@ This will create the library in the subdirectory "dist/build".
 
 Next you may install the library.  Depending on where your Haskell system is
 installled and where you are installing the library you may need administrator
-privilages to that:
+privilages to do that:
 ``` > runhaskell Setup.hs install
 
 Now you should be ready to use the library.
