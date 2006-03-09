@@ -1,12 +1,10 @@
-2.0 (7 March 2006)
-  - Removed SearchT and ContT (because I never use them, 
-    and their implementations were too complicated).
+2.0 (9 March 2006)
   - Refactored the monad prelude: methods have different names,
     and there are some new classes making the features more modular.
   - Added a new combinator 'ifM', 
     and implemented a few of the others with it.
-  - This should be a more or less stable version.  The only changes I
-    anticipate in the future:
+  - This should be a stable version of the interface.
+    Hopefully most changes should be:
     - bug fixes (hopefully few)
     - performance tuning (tweaks to balance laziness with memory leaks)
 

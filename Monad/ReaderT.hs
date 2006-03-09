@@ -1,15 +1,10 @@
 -- | An implementation of the reader (aka environment) monad transformer.
 -- It is useful when computations need to access some immutable context.
---
---
--- * Commutes with: "Monad.ReaderT", "Monad.WriterT", "Monad.StateT"
--- 
--- * Does not commute with: "Monad.ExceptT"
-module Monad.ReaderT 
-  ( -- * Instance notes
 
-    -- ** instance 'HandlerM'
+module Monad.ReaderT 
+  ( -- * Examples
     -- $HandlerM
+    -- $SearchM
 
   ReaderT, runReader, module Monad.Prelude
   ) where
@@ -26,15 +21,15 @@ newtype ReaderT r m a = R (r -> m a)
 runReader          :: r -> ReaderT r m a -> m a
 runReader r (R m)   = m r
 
-instance Functor m => Functor (ReaderT r m) where
-  fmap f m          = R (\r -> fmap f (runReader r m))
+instance Monad m => Functor (ReaderT r m) where
+  fmap f m          = liftM f m
 
 instance Monad m => Monad (ReaderT r m) where
-  return a          = R (\_ -> return a)
+  return a          = lift (return a)
   m >>= k           = R (\r -> (runReader r . k) =<< runReader r m)
 
 instance BaseM m b => BaseM (ReaderT r m) b where
-  inBase m          = lift (inBase m)
+  inBase m          = lift $ inBase m
 
 instance Trans (ReaderT r) where
   lift m            = R (\_ -> m)
@@ -42,21 +37,19 @@ instance Trans (ReaderT r) where
 instance MonadFix m => MonadFix (ReaderT r m) where
   mfix f            = R (\r -> mfix (runReader r . f))
 
-instance MonadPlus m => MonadPlus (ReaderT r m) where
-  mzero             = lift mzero
-  mplus (R f) (R g) = R (\r -> mplus (f r) (g r))
-
 instance Monad m => ReaderM (ReaderT r m) r where
-  getR              = R (\r -> return r)
+  getR              = R return
 
 instance Monad m => ReadUpdM (ReaderT r m) r where
-  updateR f m       = R (\r -> runReader (f r) m)
+  updateR f m       = do r <- getR
+                         lift $ runReader (f r) m
 
 instance WriterM m w => WriterM (ReaderT r m) w where
   put o             = lift (put o)
 
 instance CollectorM m w => CollectorM (ReaderT r m) w where
-  collect m         = R (\r -> collect (runReader r m))
+  collect m         = do r <- getR
+                         lift $ collect (runReader r m)
 
 instance StateM m s => StateM (ReaderT r m) s where
   get               = lift get
@@ -76,7 +69,39 @@ instance ExceptM m e => ExceptM (ReaderT r m) e where
 -- produces @Right 42@
 
 instance HandlerM m e => HandlerM (ReaderT r m) e where
-  handle m h        = R (\r -> withHandler (runReader r . h)
-                             $ runReader r m) 
+  handle m h        = do r <- getR 
+                         lift $ withHandler (runReader r . h)
+                              $ runReader r m
+
+instance MonadPlus m => MonadPlus (ReaderT r m) where
+  mzero             = lift mzero
+  mplus m n         = do r <- getR 
+                         lift $ mplus (runReader r m) (runReader r n)
+
+
+-- $SearchM$
+-- The context for all alternatives is fixed at the time when we 'checkSearch'.
+-- For example:
+--
+-- > test = runId $ runSearchOne $ runReader 42
+-- >      $ do x <- checkSearch (getR `mplus` getR)
+-- >           case x of
+-- >             Just (_,next) -> setR 17 next
+-- >             Nothing       -> return 0
+--
+-- produces @Just 42@
+
+instance SearchM m => SearchM (ReaderT r m) where
+  checkSearch m     = do r <- getR 
+                         lift ((f # ) # checkSearch (runReader r m))
+    where f (a,x)   = (a, lift x)
                                 
+
+instance ContM m => ContM (ReaderT r m) where
+  callcc m        = do r <- getR
+                       lift $ callcc $ \k -> 
+                              runReader r $ m $ \a -> lift (k a)
+
+
+
 

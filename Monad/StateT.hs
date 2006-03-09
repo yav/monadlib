@@ -1,14 +1,8 @@
 -- | An implementation of the state monad transformer.
 -- Provides the ability to manipulate a piece of state.
---
--- 
--- * Commutes with: "Monad.ReaderT", "Monad.WriterT", "Monad.StateT"
--- 
--- * Does not commute with: "Monad.ExceptT"
-module Monad.StateT 
-  ( -- * Instance notes
 
-    -- ** instance 'HandlerM'
+module Monad.StateT 
+  ( -- * Examples
     -- $HandlerM
 
   StateT, runState, evalState, execState, module Monad.Prelude
@@ -40,11 +34,12 @@ execState s m       = fmap snd (runState s m)
 
 
 
-instance Functor m => Functor (StateT s m) where
-  fmap f (S m)      = S (\s -> fmap (\ (a,s1) -> (f a, s1)) (m s))
+instance Monad m => Functor (StateT s m) where
+  fmap f m          = do x <- m
+                         return (f x)
 
 instance Monad m => Monad (StateT s m) where
-  return a          = S (\s -> return (a,s))
+  return a          = lift (return a)
   S m1 >>= k        = S (\s -> do (a,s1)  <- m1 s
                                   let S m2  = k a
                                   m2 s1)
@@ -60,20 +55,13 @@ instance MonadFix m => MonadFix (StateT s m) where
   mfix f            = S (\s -> mfix (\it -> let S m = f (fst it)
                                             in m s))
 
-instance MonadPlus m => MonadPlus (StateT s m) where
-  mzero             = lift mzero
-  mplus (S f) (S g) = S (\s -> mplus (f s) (g s))
-
-
 instance ReaderM m r => ReaderM (StateT s m) r where
   getR              = lift getR
 
 instance ReadUpdM m r => ReadUpdM (StateT s m) r where
   updateR f m       = do s <- get
                          let m' = runState s m
-                         (a,s) <- lift (updateR f m')
-                         set s
-                         return a
+                         lift' (updateR f m')
 
 instance WriterM m w => WriterM (StateT s m) w where
   put o             = lift (put o)
@@ -105,10 +93,34 @@ instance ExceptM m e => ExceptM (StateT s m) e where
 
 instance HandlerM m e => HandlerM (StateT s m) e where
   handle m h        = do s <- get
-                         let m'   = runState s m
-                             h' e = runState s (h e)
-                         (a,s) <- lift (handle m' h')
+                         lift' $ handle (runState s m)
+                               $ \e -> runState s (h e)
+
+instance MonadPlus m => MonadPlus (StateT s m) where
+  mzero             = lift mzero
+  mplus m n         = do s <- get
+                         (a,s) <- lift (runState s m `mplus` runState s n)
                          set s
                          return a
+
+
+instance SearchM m => SearchM (StateT s m) where
+  checkSearch m     = do s <- get 
+                         x <- lift $ checkSearch $ runState s m
+                         case x of
+                           Nothing -> return Nothing
+                           Just ((a,s),xs) -> do set s
+                                                 return (Just (a,lift' xs))
+
+instance ContM m => ContM (StateT s m) where
+  callcc m          = do s <- get
+                         lift' $ callcc $ \k -> 
+                                 runState s $ m $ \a -> lift (k (a,s))
+     
+lift' m = do (a,s) <- lift m
+             set s
+             return a
+
+
 
 

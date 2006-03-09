@@ -12,6 +12,7 @@ Extra-source-files:
 Exposed-modules:
   Monad.Combinators, Monad.ForEach, Monad.Prelude, Monad.Transformers
   Monad.Id, Monad.ReaderT,  Monad.WriterT, Monad.StateT, Monad.ExceptT
+  Monad.SearchT, Monad.ContT
 Extensions:     
   MultiParamTypeClasses, FunctionalDependencies, PolymorphicComponents 
 GHC-options:    -O2 -W

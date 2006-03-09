@@ -2,6 +2,8 @@ module Monad.Prelude
   ( module Monad.Prelude
   , module Monad.Combinators
   , module Monad.ForEach
+  -- * Examples
+  -- $ContEx
   ) where
 
 import Monad.Combinators
@@ -177,6 +179,54 @@ withHandler h m     = m `handle` h
 -- | The handler is the second argument.
 handle_            :: HandlerM m e => m a -> m a -> m a
 handle_ m h         = m `handle` \_ -> h
+
+
+-- Backtracking computations ---------------------------------------------------
+
+class MonadPlus m => SearchM m where
+
+  -- | Turn searches into values:
+  -- @Nothing@ signifies that a search failed;
+  -- @Just (x,xs)@ signifies that we found a value /x/, and we can continue
+  -- the search with /xs/.
+  -- The resulting computation always succeds with one answer.
+  
+  checkSearch      :: m a -> m (Maybe (a, m a))
+
+
+-- Explicit continuations ------------------------------------------------------                   
+class Monad m => ContM m where
+
+  -- | Call with current continuation.
+  callcc           :: ((a -> m b) -> m a) -> m a
+
+
+-- | An explicit representation for continuations that store a value.
+data Cont m a       = Cont ((a, Cont m a) -> m ())
+
+-- | Capture the current continuation.  
+-- This function is like 'return', except that it also captures
+-- the current continuation.  Later we can use 'cJump' to go back to
+-- the continuation with a possibly different value.
+returnCC           :: ContM m => a -> m (a, Cont m a)
+returnCC x          = callcc (\k -> return (x, Cont k))
+
+cJump              :: ContM m => a -> Cont m a -> m ()
+cJump x (Cont k)    = k (x, Cont k)
+
+
+-- $ContEx
+-- An example of using the explicit continuations. 
+-- We use "Monad.ContT" to add continuations to the 'IO' monad.
+-- 
+-- > test :: IO ()
+-- > test = runCont
+-- >      $ do (x,k) <- returnCC 0
+-- >           when (x < 10) $ do inBase (print x)
+-- >                              cJump (x+1) k 
+--
+-- This program will print the numbers 0 through 9 on the screen.
+
 
 
 
