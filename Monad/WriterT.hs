@@ -24,40 +24,42 @@ import Data.Monoid
 
 -- | A computation that computes a result of type /a/, may place items 
 -- in a buffer of type /w/, and can also side-effect as described by /m/.
-newtype WriterT w m a = W { runWriter :: m (a,w) }
+newtype WriterT w m a = W { unW :: m (P a w) }
+data P a w            = P { res :: a, out :: !w }
+
+runWriter          :: Monad m => WriterT w m a -> m (a,w) 
+runWriter (W m)     = do P a w <- m
+                         return (a,w)
 
 -- | Execute a computation ignoring the output.
 evalWriter         :: Monad m => WriterT w m a -> m a
-evalWriter m        = fst # runWriter m
+evalWriter (W m)    = res # m
 
 -- | Execute a computation just for the output.
 execWriter          :: Monad m => WriterT w m a -> m w
-execWriter m        = snd # runWriter m
+execWriter (W m)     = out # m
 
 instance (Monoid w, Monad m) => Functor (WriterT w m) where
   fmap f m          = liftM f m
 
 instance (Monoid w, Monad m) => Monad (WriterT w m) where
   return a          = lift (return a)
-  W m >>= k         = W (do (a,w1) <- m
-                            (b,w2) <- runWriter (k a)
-                            let w = w1 `mappend` w2
-                            seq w (return (b,w)))
-  W m >> W n        = W (do (_,w1) <- m
-                            (b,w2) <- n
-                            let w = w1 `mappend` w2
-                            seq w (return (b,w)))
-  
+  W m >>= k         = W (do P a w1 <- m
+                            P b w2 <- unW (k a)
+                            return (P b (w1 `mappend` w2)))
+  W m >> W n        = W (do P _ w1 <- m
+                            P b w2 <- n
+                            return (P b (w1 `mappend` w2)))
                         
 instance Monoid w => Trans (WriterT w) where
   lift m            = W (do a <- m
-                            return (a,mempty))
+                            return (P a mempty))
 
 instance (Monoid w, BaseM m b) => BaseM (WriterT w m) b where
   inBase m          = lift (inBase m)
 
 instance (Monoid w, MonadFix m) => MonadFix (WriterT w m) where
-  mfix f            = W (mfix (\r -> runWriter (f (fst r))))
+  mfix f            = W (mfix (\r -> unW (f (res r))))
 
                         
 instance (Monoid w, ReaderM m r) => ReaderM (WriterT w m) r where
@@ -68,14 +70,14 @@ instance (Monoid w, ReadUpdM m r) => ReadUpdM (WriterT w m) r where
   setR x (W m)       = W (setR x m)
 
 instance (Monoid w, Monad m) => WriterM (WriterT w m) w where
-  put w             = seq w (W (return ((), w)))
+  put w             = W (return (P () w))
 
 instance (Monoid w, Monad m) => CollectorM (WriterT w m) w where
-  censor (W m) f    = W (do (a,w1) <- m
-                            (b,w2) <- runWriter (f w1)
-                            return ((a,b),w2))
-  collect (W m)     = W (do r <- m
-                            return (r,mempty))
+  censor (W m) f    = W (do P a w1 <- m
+                            P b w2 <- unW (f w1)
+                            return (P (a,b) w2))
+  collect (W m)     = W (do P a w <- m
+                            return (P (a,w) mempty))
 
 instance (Monoid w, StateM m s) => StateM (WriterT w m) s where
   get               = lift get
@@ -99,9 +101,9 @@ instance (Monoid w, ExceptM m e) => ExceptM (WriterT w m) e where
 instance (Monoid w, HandlerM m e) => HandlerM (WriterT w m) e where
   checkExcept (W m) = W (do r <- checkExcept m
                             case r of
-                              Left err    -> return (Left err,mempty)
-                              Right (a,w) -> return (Right a, w))
-  handle (W m) h    = W (m `handle` (\e -> runWriter (h e)))
+                              Left err      -> return (P (Left err) mempty)
+                              Right (P a w) -> return (P (Right a) w))
+  handle (W m) h    = W (m `handle` (\e -> unW (h e)))
 
 instance (Monoid w, MonadPlus m) => MonadPlus (WriterT w m) where
   mzero             = lift mzero
@@ -110,10 +112,10 @@ instance (Monoid w, MonadPlus m) => MonadPlus (WriterT w m) where
 instance (Monoid w, SearchM m) => SearchM (WriterT w m) where
   checkSearch (W m) = W $ do x <- checkSearch m
                              case x of
-                               Nothing -> return (Nothing, mempty)
-                               Just ((x,w),m) -> return (Just (x,W m), w)
+                               Nothing -> return (P Nothing mempty)
+                               Just (P x w,m) -> return (P (Just (x,W m)) w)
 
 instance (Monoid w, ContM m) => ContM (WriterT w m) where
   callcc m          = W $ callcc $ \k -> 
-                          runWriter $ m $ \a -> W (k (a,mempty))
+                          unW $ m $ \a -> W (k (P a mempty))
 

@@ -22,6 +22,9 @@ instance ForEach Maybe where
   forEach Nothing _   = return Nothing
   forEach (Just x) f  = Just `liftM` f x
 
+  forEach_ Nothing _  = return ()
+  forEach_ (Just x) f = f x >> return ()
+
 
 
 

@@ -60,7 +60,7 @@ instance MonadFix m => MonadFix (ExceptT x m) where
                          return (a,r)
 
       fail' x       = do r <- fail x
-                         return (error "<<ExceptT: 'mfix' looped>",r)
+                         return (error "<<ExceptT: 'mfix' looped>>",r)
 
 
 instance ReaderM m r => ReaderM (ExceptT x m) r where

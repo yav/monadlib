@@ -2,6 +2,15 @@ module Monad.Combinators (module Monad.Combinators, module Control.Monad) where
 
 import Control.Monad
 
+{-# INLINE ( # ) #-}
+{-# INLINE ( @@ ) #-}
+{-# INLINE ( <# ) #-}
+{-# INLINE ( <## ) #-}
+
+{-# INLINE ifM #-}
+{-# INLINE whenM #-}
+{-# INLINE andM #-}
+{-# INLINE orM #-}
 
 -- Monadic functions -----------------------------------------------------------
 
