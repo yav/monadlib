@@ -43,6 +43,11 @@ instance (Monoid w, Monad m) => Monad (WriterT w m) where
                             (b,w2) <- runWriter (k a)
                             let w = w1 `mappend` w2
                             seq w (return (b,w)))
+  W m >> W n        = W (do (_,w1) <- m
+                            (b,w2) <- n
+                            let w = w1 `mappend` w2
+                            seq w (return (b,w)))
+  
                         
 instance Monoid w => Trans (WriterT w) where
   lift m            = W (do a <- m
@@ -60,17 +65,22 @@ instance (Monoid w, ReaderM m r) => ReaderM (WriterT w m) r where
 
 instance (Monoid w, ReadUpdM m r) => ReadUpdM (WriterT w m) r where
   updateR f (W m)    = W (updateR f m)
+  setR x (W m)       = W (setR x m)
 
 instance (Monoid w, Monad m) => WriterM (WriterT w m) w where
   put w             = seq w (W (return ((), w)))
 
 instance (Monoid w, Monad m) => CollectorM (WriterT w m) w where
+  censor (W m) f    = W (do (a,w1) <- m
+                            (b,w2) <- runWriter (f w1)
+                            return ((a,b),w2))
   collect (W m)     = W (do r <- m
                             return (r,mempty))
 
 instance (Monoid w, StateM m s) => StateM (WriterT w m) s where
   get               = lift get
   set s             = lift (set s)
+  update f          = lift (update f)
 
 instance (Monoid w, ExceptM m e) => ExceptM (WriterT w m) e where
   raise e           = lift (raise e)
@@ -87,6 +97,10 @@ instance (Monoid w, ExceptM m e) => ExceptM (WriterT w m) e where
 -- produces @Right (42, \"\")@
 
 instance (Monoid w, HandlerM m e) => HandlerM (WriterT w m) e where
+  checkExcept (W m) = W (do r <- checkExcept m
+                            case r of
+                              Left err    -> return (Left err,mempty)
+                              Right (a,w) -> return (Right a, w))
   handle (W m) h    = W (m `handle` (\e -> runWriter (h e)))
 
 instance (Monoid w, MonadPlus m) => MonadPlus (WriterT w m) where

@@ -39,6 +39,7 @@ instance Functor (ContT o m) where
 instance Monad (ContT o m) where
   return x          = C (\k -> k x)
   C m1 >>= k        = C (\k1 -> m1 (\a -> let C m2 = k a in m2 k1))
+  C m >> C n        = C (\k -> m (\_ -> n k))
 
 instance Trans (ContT o) where
   lift m            = C (\k -> k =<< m) 
@@ -64,6 +65,7 @@ instance WriterM m w => WriterM (ContT o m) w where
 instance StateM m s => StateM (ContT o m) s where
   get               = lift get
   set s             = lift (set s)
+  update f          = lift (update f)
 
 -- $ExceptM
 -- Raising an exception cancels the continuation.

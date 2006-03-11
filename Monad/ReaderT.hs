@@ -26,10 +26,11 @@ instance Monad m => Functor (ReaderT r m) where
 
 instance Monad m => Monad (ReaderT r m) where
   return a          = lift (return a)
-  m >>= k           = R (\r -> (runReader r . k) =<< runReader r m)
+  R m >>= k         = R (\r -> (runReader r . k) =<< m r)
+  R m >> R n        = R (\r -> m r >> n r)
 
 instance BaseM m b => BaseM (ReaderT r m) b where
-  inBase m          = lift $ inBase m
+  inBase m          = lift (inBase m)
 
 instance Trans (ReaderT r) where
   lift m            = R (\_ -> m)
@@ -41,19 +42,20 @@ instance Monad m => ReaderM (ReaderT r m) r where
   getR              = R return
 
 instance Monad m => ReadUpdM (ReaderT r m) r where
-  updateR f m       = do r <- getR
-                         lift $ runReader (f r) m
+  updateR f (R m)   = R (\r -> m (f r))
+  setR r (R m)      = R (\_ -> m r)
 
 instance WriterM m w => WriterM (ReaderT r m) w where
   put o             = lift (put o)
 
 instance CollectorM m w => CollectorM (ReaderT r m) w where
-  collect m         = do r <- getR
-                         lift $ collect (runReader r m)
+  censor (R m) f    = R (\r -> censor (m r) (runReader r . f))
+  collect (R m)     = R (\r -> collect (m r))
 
 instance StateM m s => StateM (ReaderT r m) s where
   get               = lift get
   set s             = lift (set s)
+  update f          = lift (update f)
 
 instance ExceptM m e => ExceptM (ReaderT r m) e where
   raise e           = lift (raise e)
@@ -69,14 +71,12 @@ instance ExceptM m e => ExceptM (ReaderT r m) e where
 -- produces @Right 42@
 
 instance HandlerM m e => HandlerM (ReaderT r m) e where
-  handle m h        = do r <- getR 
-                         lift $ withHandler (runReader r . h)
-                              $ runReader r m
+  handle (R m) h    = R (\r -> withHandler (runReader r . h) (m r))
+  checkExcept (R m) = R (\r -> checkExcept (m r))
 
 instance MonadPlus m => MonadPlus (ReaderT r m) where
   mzero             = lift mzero
-  mplus m n         = do r <- getR 
-                         lift $ mplus (runReader r m) (runReader r n)
+  mplus (R m) (R n) = R (\r -> mplus (m r) (n r))
 
 
 -- $SearchM$
@@ -92,15 +92,13 @@ instance MonadPlus m => MonadPlus (ReaderT r m) where
 -- produces @Just 42@
 
 instance SearchM m => SearchM (ReaderT r m) where
-  checkSearch m     = do r <- getR 
-                         lift ((f # ) # checkSearch (runReader r m))
+  checkSearch (R m) = R (\r -> (f # ) # checkSearch (m r))
     where f (a,x)   = (a, lift x)
                                 
 
 instance ContM m => ContM (ReaderT r m) where
-  callcc m        = do r <- getR
-                       lift $ callcc $ \k -> 
-                              runReader r $ m $ \a -> lift (k a)
+  callcc m        = R (\r -> callcc $ \k -> 
+                             runReader r $ m $ \a -> lift (k a))
 
 
 

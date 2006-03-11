@@ -52,10 +52,12 @@ class ReaderM m r => ReadUpdM m r | m -> r where
 
   -- | Modify the context for the duration of a computation.
   updateR          :: (r -> r) -> m a -> m a
+  updateR f m       = do r <- getR
+                         setR (f r) m
 
--- | Set the context to a particular value for the duration of a computation.
-setR               :: ReadUpdM m r => r -> m a -> m a
-setR r m            = updateR (\_ -> r) m         
+  -- | Set the context to a particular value for the duration of a computation.
+  setR             :: r -> m a -> m a
+  setR r m          = updateR (\_ -> r) m         
 
 
 

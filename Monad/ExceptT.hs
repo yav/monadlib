@@ -67,6 +67,10 @@ instance ReaderM m r => ReaderM (ExceptT x m) r where
   getR              = lift getR
 
 instance ReadUpdM m r => ReadUpdM (ExceptT x m) r where
+  setR x (E m)      = E (\ok fail -> do r <- getR
+                                        let ok' a   = setR r (ok a)
+                                            fail' x = setR r (fail x)
+                                        setR x (m ok' fail'))
   updateR f (E m)   = E (\ok fail -> do r <- getR
                                         let ok' a   = setR r (ok a)
                                             fail' x = setR r (fail x)
@@ -99,11 +103,13 @@ instance WriterM m o => WriterM (ExceptT x m) o where
 instance StateM m s => StateM (ExceptT x m) s where
   get               = lift get
   set s             = lift (set s)
+  update f          = lift (update f)
 
 instance Monad m => ExceptM (ExceptT x m) x where
   raise x           = E (\_ fail -> fail x)
 
 instance Monad m => HandlerM (ExceptT x m) x where
+  checkExcept (E f) = E (\ok _ -> f (\a -> ok (Right a)) (\x -> ok (Left x)))
   handle (E f) h    = E (\ok fail -> f ok (\x -> let E g = h x
                                                  in g ok fail))
 

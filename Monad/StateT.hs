@@ -23,26 +23,29 @@ runState           :: s -> StateT s m a -> m (a,s)
 runState s (S m)    = m s
 
 -- | Execute a stateful computation ignoring the final state.
-evalState          :: Functor m => s -> StateT s m a -> m a
-evalState s m       = fmap fst (runState s m)
+evalState          :: Monad m => s -> StateT s m a -> m a
+evalState s m       = fst # runState s m
 
 -- | Execute a stateful computation just for the state.
-execState          :: Functor m => s -> StateT s m a -> m s
-execState s m       = fmap snd (runState s m)
+execState          :: Monad m => s -> StateT s m a -> m s
+execState s m       = snd # runState s m
 
                                         
 
 
 
 instance Monad m => Functor (StateT s m) where
-  fmap f m          = do x <- m
-                         return (f x)
+  fmap f m          = f # m
 
 instance Monad m => Monad (StateT s m) where
   return a          = lift (return a)
-  S m1 >>= k        = S (\s -> do (a,s1)  <- m1 s
-                                  let S m2  = k a
-                                  m2 s1)
+  S m >>= k         = S (\s -> do (a,s1)  <- m s
+                                  let S n  = k a
+                                  n s1)
+  S m >> S n        = S (\s -> do (_,s1) <- m s
+                                  n s1)
+
+                                   
 
 instance Trans (StateT s) where
   lift m            = S (\s -> do x <- m
@@ -59,23 +62,22 @@ instance ReaderM m r => ReaderM (StateT s m) r where
   getR              = lift getR
 
 instance ReadUpdM m r => ReadUpdM (StateT s m) r where
-  updateR f m       = do s <- get
-                         let m' = runState s m
-                         lift' (updateR f m')
+  setR x (S m)      = S (\s -> setR x (m s))
+  updateR f (S m)   = S (\s -> updateR f (m s))
 
 instance WriterM m w => WriterM (StateT s m) w where
   put o             = lift (put o)
 
+-- Note: Currently the censor sees the changes of the state done by
+-- the computation... Is that correct?
 instance CollectorM m w => CollectorM (StateT s m) w where
-  collect m         = do s <- get
-                         let m' = runState s m
-                         ((a,s'),o) <- lift (collect m')
-                         set s'
-                         return (a,o)
+  collect (S m)     = S (\s -> do ((a,s'),o) <- collect (m s)
+                                  return ((a,o),s'))
 
 instance Monad m => StateM (StateT s m) s where
   get               = S (\s -> return (s,s))
   set s             = S (\s1 -> return (s1,s))
+  update f          = S (\s -> return (s,f s))
 
 
 instance ExceptM m e => ExceptM (StateT s m) e where
@@ -92,35 +94,21 @@ instance ExceptM m e => ExceptM (StateT s m) e where
 -- produces @Right (42,42)@
 
 instance HandlerM m e => HandlerM (StateT s m) e where
-  handle m h        = do s <- get
-                         lift' $ handle (runState s m)
-                               $ \e -> runState s (h e)
+  handle (S m) h    = S (\s -> handle (m s) (runState s . h))
 
 instance MonadPlus m => MonadPlus (StateT s m) where
   mzero             = lift mzero
-  mplus m n         = do s <- get
-                         (a,s) <- lift (runState s m `mplus` runState s n)
-                         set s
-                         return a
-
+  mplus (S m) (S n) = S (\s -> m s `mplus` n s) 
 
 instance SearchM m => SearchM (StateT s m) where
-  checkSearch m     = do s <- get 
-                         x <- lift $ checkSearch $ runState s m
-                         case x of
-                           Nothing -> return Nothing
-                           Just ((a,s),xs) -> do set s
-                                                 return (Just (a,lift' xs))
+  checkSearch (S m) = S (\s -> do x <- checkSearch (m s)
+                                  case x of
+                                    Nothing -> return (Nothing,s)
+                                    Just ((a,s),xs) -> 
+                                      return (Just (a,S (\_ -> xs)),s))
 
 instance ContM m => ContM (StateT s m) where
-  callcc m          = do s <- get
-                         lift' $ callcc $ \k -> 
-                                 runState s $ m $ \a -> lift (k (a,s))
+  callcc m          = S (\s -> callcc $ \k -> 
+                               runState s $ m $ \a -> lift (k (a,s)))
      
-lift' m = do (a,s) <- lift m
-             set s
-             return a
-
-
-
 
