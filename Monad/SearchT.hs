@@ -1,74 +1,61 @@
--- | An implementation of a searching transformer.
--- In 'mplus' alternatives are processed left to right, 
--- so avoid left recursion.  This implementation uses an explicit
--- data structure (i.e., it is not in continuation passing style).
+-- | A search (aka backtracking) transformer.
+-- We use the class 'MonadPlus' to specify alternatives.
+-- In 'mplus' alternatives are processed left to right, so avoid left recursion.
+-- This implementation uses rank-2 polymorphism.
 
 module Monad.SearchT 
-  ( SearchT, Answer(..)
-  , runSearch, runSearchOne, runSearchAll
+  ( SearchT, runSearchOne, runSearchAll, unsafeRunSearch, runSearch
+  , ListM(..)
+  , module Monad.Prelude
+  -- * Examples
+  -- $Examples
   ) where
 
+
 import Monad.Prelude
-import Control.Monad.Fix
 
-newtype SearchT m a = S { runSearch :: m (Answer m a) }
 
--- | Answers returned by a search.
-data Answer m a     = No                    -- ^ There was no result.
-                    | Yes a (SearchT m a)   -- ^ We founds a result, 
-                                            --      and there may be more.
+-- | Computations that may backtrack,
+-- side effect as described by /m/,
+-- and return a result(s) of type /a/.
+newtype SearchT m a  = C { unC :: forall r. (a -> m r -> m r) -> m r -> m r }
 
--- | Find the first answer of a computation. 
+-- | The answer from a search.
+data ListM m a      = Nil  
+                      -- ^ No answer.
+
+                    | Cons a (m (ListM m a))    
+                      -- ^ An answer and a computation to produce more answers.
+
+-- | Get the results of a search one at a time.
+runSearch          :: Monad m => SearchT m a -> m (ListM m a)
+runSearch (C m)     = m (\x xs -> return (Cons x xs)) (return Nil)
+
+-- | Look for at most one answer.
 runSearchOne       :: Monad m => SearchT m a -> m (Maybe a)
-runSearchOne (S m)  = do x <- m
-                         return (case x of
-                                   No -> Nothing
-                                   Yes x _ -> Just x)
+runSearchOne (C m)  = m (\x _ -> return (Just x)) (return Nothing)
 
--- | Find all possible answers for a computation.  
+-- | Look for all answers.
 runSearchAll       :: Monad m => SearchT m a -> m [a]
-runSearchAll (S m)  = do x <- m
-                         case x of
-                           No -> return []
-                           Yes x xs -> (x:) # runSearchAll xs
+runSearchAll (C m)  = m (\x xs -> (x:) # xs) (return [])
 
-instance Monad m => Functor (SearchT m) where
+-- | Look for exactly one answer.  Crashes if there is no answer.
+unsafeRunSearch    :: Monad m => SearchT m a -> m a
+unsafeRunSearch (C m) = m (\x _ -> return x) err
+  where err = error "unsafeRunSerach: no result."
+
+
+
+instance Functor (SearchT m) where
   fmap f m          = liftM f m
 
-instance Monad m => Monad (SearchT m) where
-  return x          = lift (return x)
-  S m >>= f         = S (do x <- m
-                            case x of
-                              No -> return No
-                              Yes x xs -> runSearch (f x `mplus` (xs >>= f)))
-  S m >> S n = S (do x <- m
-                     case x of
-                       No -> return No
-                       Yes _ xs -> 
-                         do x <- n
-                            case x of
-                              No -> runSearch (xs >> S n)
-                              Yes x ys -> 
-                                 return (Yes x (ys `mplus` (xs >> S n))))
+instance Monad (SearchT m) where
+  return x          = C (\c n -> c x n)
+  C a >>= f         = C (\c n -> a (\x xs -> unC (f x) c xs) n)
   
-
 instance Trans SearchT where
-  lift m            = S (do x <- m
-                            return (Yes x mzero))
-
-instance MonadFix m => MonadFix (SearchT m) where
-  mfix f            = S (do z <- mfix (runSearch . f . head)
-                            return $ case z of
-                                       No -> No
-                                       Yes x _ -> Yes x (mfix (tail . f)))
-    where 
-    loop            = error "<<SearchT: 'mfix' looped>>"
-    head (Yes x _)  = x
-    head _          = loop
-    tail (S m)      = S (do x <- m
-                            case x of
-                              Yes _ xs -> runSearch xs
-                              _        -> loop)
+  lift m            = C (\c n -> do x <- m
+                                    c x n)
 
 instance BaseM m b => BaseM (SearchT m) b where
   inBase m          = lift (inBase m)
@@ -87,22 +74,58 @@ instance StateM m s => StateM (SearchT m) s where
 instance ExceptM m x => ExceptM (SearchT m) x where
   raise x           = lift (raise x)
 
-instance Monad m => MonadPlus (SearchT m) where
-  mzero             = S (return No)
-  mplus (S m) (S n) = S (do x <- m
-                            case x of
-                               No -> n
-                               Yes x xs -> return (Yes x (xs `mplus` S n)))
-
-instance Monad m => SearchM (SearchT m) where
-  checkSearch (S m) = S (do x <- m
-                            return (case x of
-                                      No -> Yes Nothing mzero
-                                      Yes x xs -> Yes (Just (x,xs)) mzero))
+instance MonadPlus (SearchT m) where
+  mzero             = C (\_ n -> n)
+  mplus (C x) (C y) = C (\c n -> x c (y c n))
 
 instance ContM m => ContM (SearchT m) where
-  callcc m          = S (callcc $ \k -> 
-                         runSearch $ m $ \a -> lift $ k (Yes a mzero))
+  callcc m          = C (\c n -> 
+    do (x,k) <- returnCC Nothing
+       case x of
+         Nothing -> unC (m $ \a -> lift $ cJump (Just a) k) c n
+         Just a  -> c a n)
 
-                               
-  
+
+{- $Examples
+
+Backtracking does not affect the output.
+
+> prop_SearchT'WriterM = test == ["World","Hello"]
+>   where test  = runId $ execWriter $ runSearchOne
+>               $ do put ["Hello"]
+>                    mzero
+>                  `mplus` 
+>                 put ["World"]
+
+
+Backtracking does not affect the state.
+
+> prop_SearchT'StateM = test == (Just 17, 17)
+>   where test  = runId $ runState 42 $ runSearchOne
+>               $ do set 17
+>                    mzero
+>                 `mplus`
+>                   get
+
+
+Backtracking is cancelled by an exception.
+
+> prop_SearchT'ExceptM = test == Left "Error"
+>   where test  = runId $ runExcept $ runSearchOne
+>               $ raise "Error" `mplus` return 42
+
+
+
+Jumping to a continuation cancells (local) backtracking.
+
+> prop_SearchT'ContM = test == [42,10]
+>   where test  = runId $ runCont $ runSearchAll
+>               $ do (stop,k) <- returnCC False
+>                    if stop then return 42  
+>                            else cJump True k `mplus` return 17
+>                  `mplus` return 10
+
+-}
+
+
+

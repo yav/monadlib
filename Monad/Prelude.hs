@@ -67,7 +67,7 @@ class ReaderM m r => ReadUpdM m r | m -> r where
 -- | Monads that can perform output.
 class Monad m => WriterM m w | m -> w where
 
-  -- | Add a value to the output.
+  -- | Add to the output.
   put              :: w -> m ()
 
 -- | Promote a pair to a computation with output.
@@ -118,11 +118,11 @@ class Monad m => StateM m s | m -> s where
                          set (f x)
                          return x
 
--- | Update the state, and dicard the old state.
+-- | Update the state, and discard the old state.
 update_            :: StateM m s => (s -> s) -> m ()
 update_ f           = update f >> return ()
 
--- | Set the state, without using the old state.
+-- | Set the state, and discard the old state.
 set_               :: StateM m s => s -> m ()
 set_ s              = set s >> return ()
 
@@ -183,18 +183,6 @@ handle_            :: HandlerM m e => m a -> m a -> m a
 handle_ m h         = m `handle` \_ -> h
 
 
--- Backtracking computations ---------------------------------------------------
-
-class MonadPlus m => SearchM m where
-
-  -- | Turn searches into values:
-  -- @Nothing@ signifies that a search failed;
-  -- @Just (x,xs)@ signifies that we found a value /x/, and we can continue
-  -- the search with /xs/.
-  -- The resulting computation always succeds with one answer.
-  
-  checkSearch      :: m a -> m (Maybe (a, m a))
-
 
 -- Explicit continuations ------------------------------------------------------                   
 class Monad m => ContM m where
@@ -204,7 +192,7 @@ class Monad m => ContM m where
 
 
 -- | An explicit representation for continuations that store a value.
-data Cont m a       = Cont ((a, Cont m a) -> m ())
+newtype Cont m a    = Cont ((a, Cont m a) -> m ())
 
 -- | Capture the current continuation.  
 -- This function is like 'return', except that it also captures
@@ -213,8 +201,9 @@ data Cont m a       = Cont ((a, Cont m a) -> m ())
 returnCC           :: ContM m => a -> m (a, Cont m a)
 returnCC x          = callcc (\k -> return (x, Cont k))
 
-cJump              :: ContM m => a -> Cont m a -> m ()
-cJump x (Cont k)    = k (x, Cont k)
+cJump              :: ContM m => a -> Cont m a -> m b
+cJump x (Cont k)    = k (x, Cont k) >> return unreachable
+  where unreachable = error "(bug) cJump: unreachable"
 
 
 -- $ContEx

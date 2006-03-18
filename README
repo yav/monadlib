@@ -1,3 +1,16 @@
+2.0 (18 March 2006)
+  - SearchT is implemented in CPS and is fast.  Removed mfix instance on mfix,
+  because it turned out to be wrong, and I could not get it to work in CPS
+  from anyways.  Added examples to all transformers, which are also used
+  as simple tests for the library.  
+
+2.0 (11 March 2006)
+  - Identified a performance problem with WriterT, and provided an alternative
+    implementation, based on the state transformer.  This works better
+    because we do not need to perform an 'append' on every bind.
+    Also tried a CPS implementation, which worked better then the original,
+    but not as well as the state version (it was more complex then the state
+    version).  Currently 'SearchT' is very slow.
 
 2.0 (9 March 2006)
   - Refactored the monad prelude: methods have different names,
