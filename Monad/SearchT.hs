@@ -63,6 +63,11 @@ instance BaseM m b => BaseM (SearchT m) b where
 instance ReaderM m r => ReaderM (SearchT m) r where
   getR              = lift getR
 
+instance ReadUpdM m r => ReadUpdM (SearchT m) r where
+  setR x (C m)      = C (\c n -> do r <- getR
+                                    let c' a as = setR r $ c a (setR x as)
+                                    setR x (m c' (setR r n)))
+
 instance WriterM m w => WriterM (SearchT m) w where
   put x             = lift (put x)
 
@@ -87,6 +92,16 @@ instance ContM m => ContM (SearchT m) where
 
 
 {- $Examples
+
+Modifying the context in selected alternatives. The continutaion is not 
+affected.
+
+> prop_SearchT'ReadUpdM = test == [(1,42),(2,42),(42,42)]
+>   where test  = runId $ runReader 42 $ runSearchAll
+>               $ do xs <- setR 2 (return 1 `mplus` getR) `mplus` getR
+>                    x  <- getR
+>                    return (xs,x)
+
 
 Backtracking does not affect the output.
 

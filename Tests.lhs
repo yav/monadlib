@@ -143,6 +143,16 @@ Raising an exception does not prevent us from jumping to a continutaion.
                     == Examples from "Monad.SearchT" ==
 --------------------------------------------------------------------------------
 
+
+Modifying the context in selected alternatives.
+
+> prop_SearchT'ReadUpdM = test == [(1,42),(2,42),(42,42)] 
+>   where test  = runId $ runReader 42 $ runSearchAll
+>               $ do xs <- setR 2 (return 1 `mplus` getR) `mplus` getR
+>                    x  <- getR
+>                    return (xs,x)
+
+
 Backtracking does not affect the output. 
 
 > prop_SearchT'WriterM = test == ["World","Hello"]
