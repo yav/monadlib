@@ -1,5 +1,8 @@
+2.0 (19 March 2006)
+  - Added a 'ReadUpdM' instance for SearchT.
+
 2.0 (18 March 2006)
-  - SearchT is implemented in CPS and is fast.  Removed mfix instance on mfix,
+  - SearchT is implemented in CPS and is fast.  Removed MonadFix instance,
   because it turned out to be wrong, and I could not get it to work in CPS
   from anyways.  Added examples to all transformers, which are also used
   as simple tests for the library.  
@@ -32,7 +35,7 @@
 1.5 (28 September 2005)
   - Changed BackT to SearchT, and changed the interface for searching.
   - Removed the monads (too much to maintain, little use?), just left the 
-    transformers.  The monads can be obtained by transforming the
+    transformers.  The monads can be obtained by transforming the identity
     monad, e.g. Reader = ReaderT Id
   - Much improved Examples directory
   - Some changes to strictness behavior. Guiding principle: 

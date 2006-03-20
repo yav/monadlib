@@ -19,27 +19,23 @@
 > insts ContT       = classes \\ [ReadUpdM, CollectorM, HandlerM, MonadFix]
 
 > supports t f 
->   | f `elem` insts t  = td cYes "Yes"
->   | otherwise         = td cNo "No"
+>   | f `elem` insts t  = "<td id='yes'>Yes</td>"
+>   | otherwise         = "<td id='no'>No</td>"
 
 > save f            = writeFile f
 >                   $ unlines [ "<html><body>", table
 >                             , "</body></html>" ]
 
-> table             = unlines ( "<table>" 
+> table             = unlines ( "<table align='center'>" 
 >                             : map (tr . unwords) (headings : map row classes)
 >                            ++ ["</table>" ])
->   where headings  = map (td cHead) ("" : map (code . show) impls)
->         row f     = td cHead (code (show f)) : map (`supports` f) impls
+>   where headings  = map header ("" : map show impls)
+>         row f     = header (show f) : map (`supports` f) impls
 
-> code x            = "<code>" ++ x ++ "</code>"
 > tr x              = "<tr>" ++ x ++ "</tr>"
-> td c x            = "<td align='center' bgcolor=" ++ show c ++ ">" 
->                       ++ x ++ "</td>"
+> header txt        = "<td id='header'>" ++ txt ++ "</td>"
 
-> cYes              = "#99ff99"
-> cNo               = "#ff9999"
-> cHead             = "#ffff99"
+
 
 
 
