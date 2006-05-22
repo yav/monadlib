@@ -1,3 +1,9 @@
+2.0.1 (19 April 2006)
+
+  - New monadic combinators: `allM, `anyM`
+  - Slightly more polymorphic types for `forEachN`
+
+
 2.0 (19 March 2006)
   - Added a 'ReadUpdM' instance for SearchT.
 

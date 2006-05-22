@@ -1,5 +1,5 @@
 Name:           monadLib
-Version:        2.0
+Version:        2.0.1
 License:        BSD3
 Author:         Iavor S. Diatchki
 Maintainer:     diatchki@csee.ogi.edu
@@ -8,7 +8,7 @@ Category:       Monads
 Synopsis:       A collection of monad transformers
 Build-Depends:  base
 Extra-source-files: 
-  README, INSTALL
+  Makefile, README, INSTALL
 Exposed-modules:
   Monad.Combinators, Monad.ForEach, Monad.Prelude, Monad.Transformers,
   Monad.Id, Monad.ReaderT,  Monad.WriterT, Monad.StateT, 

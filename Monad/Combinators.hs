@@ -2,16 +2,6 @@ module Monad.Combinators (module Monad.Combinators, module Control.Monad) where
 
 import Control.Monad
 
-{-# INLINE ( # ) #-}
-{-# INLINE ( @@ ) #-}
-{-# INLINE ( <# ) #-}
-{-# INLINE ( <## ) #-}
-
-{-# INLINE ifM #-}
-{-# INLINE whenM #-}
-{-# INLINE andM #-}
-{-# INLINE orM #-}
-
 -- Monadic functions -----------------------------------------------------------
 
 -- | A convenient name for 'map'.
@@ -61,6 +51,14 @@ andM mx my          = ifM mx my (return False)
 orM                :: Monad m => m Bool -> m Bool -> m Bool
 orM mx my           = ifM mx (return True) my
 
+-- | Execute computations until one of them returns false.
+allM               :: Monad m => [m Bool] -> m Bool
+allM xs             = foldr andM (return True) xs
+
+-- | Execute computations until one of them returns true.
+anyM               :: Monad m => [m Bool] -> m Bool
+anyM xs             = foldr orM (return False) xs 
+
 
 
 -- Monadic lists ---------------------------------------------------------------
@@ -84,7 +82,7 @@ forEach2 xs ys f    = zipWithM f xs ys
 
 -- | Traverse two lists in parallel, just for the side effects.
 -- The traversing stops if either of the lists runs out of elemnets.
-forEach2_          :: Monad m => [a] -> [b] -> (a -> b -> m ()) -> m ()
+forEach2_          :: Monad m => [a] -> [b] -> (a -> b -> m c) -> m ()
 forEach2_ xs ys f   = zipWithM_ f xs ys
 
 -- | Traverse three lists in parallel, collecting the results.
@@ -97,7 +95,7 @@ forEach3 _ _ _ _                  = return []
 -- | Traverse three lists in parallel, just for the side effects.
 -- The traversing stops if either of the lists runs out of elemnets.
 forEach3_          :: Monad m 
-                   => [a] -> [b] -> [c] -> (a -> b -> c -> m ()) -> m ()
+                   => [a] -> [b] -> [c] -> (a -> b -> c -> m c) -> m ()
 forEach3_ (x:xs) (y:ys) (z:zs) f  = f x y z >> forEach3_ xs ys zs f
 forEach3_ _ _ _ _                 = return ()
 
