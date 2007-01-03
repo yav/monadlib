@@ -1,0 +1,16 @@
+Name:           monadLib
+Version:        3.0.0
+License:        BSD3
+Author:         Iavor S. Diatchki
+Maintainer:     diatchki@csee.ogi.edu
+Homepage:       http://www.csee.ogi.edu/~diacthki/monadLib
+Category:       Monads
+Synopsis:       A collection of monad transformers.
+hs-source-dirs: src
+Build-Depends:  base
+Extra-source-files: LICENSE README
+Exposed-modules: MonadLib Monads
+Extensions:     
+  MultiParamTypeClasses, FunctionalDependencies, PolymorphicComponents 
+GHC-options:    -O2 -W -fallow-undecidable-instances
+

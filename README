@@ -1,0 +1,41 @@
+This is version 3 of 'monadLib'.
+The library is in the directory 'src'.
+In this directory we have bureaucratic overhead.
+
+Files
+~~~~~
+
+LICENSE             The license for the library.
+README              This file.
+Setup.hs            Used by the Cabal framework.
+monadLib.cabal      Used by the Cabal framework.
+
+src/MonadLib.hs     The library.
+src/Monads.hs       Definitions for some more base monads (optional).
+
+
+Simple Installation
+~~~~~~~~~~~~~~~~~~~
+
+To use 'monadLib' you should place the file 'MonadLib.hs'
+(and perhaps also 'Monads.hs') in a place where your
+implementation can find it.
+
+
+Cabal Installation
+~~~~~~~~~~~~~~~~~~
+
+The library supports the Cabal framework which has many options.
+To see the available commands try:
+> runhaskell Setup.hs --help
+
+A typical installation might look something like this:
+> runhaskell Setup.hs configure
+> runhaskell Setup.hs build
+> runhaskell Setup.hs install
+
+If you have 'haddock' installed you can build the 
+documentations like this:
+> runhaskell Setup.hs haddock
+
+
