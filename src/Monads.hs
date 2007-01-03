@@ -1,10 +1,10 @@
 {-# OPTIONS_GHC -fglasgow-exts -fallow-undecidable-instances #-}
 {-|  This module contains a collection of monads that 
- - are defined in terms of the monad transformers from
- - "MonadLib".   The definitions in this module are
- - completely mechanical and so this module may become
- - obsolete if support for automated derivations for instances
- - becomes well supported across implementations.
+   are defined in terms of the monad transformers from
+   "MonadLib".   The definitions in this module are
+   completely mechanical and so this module may become
+   obsolete if support for automated derivations for instances
+   becomes well supported across implementations.
  -}
 module Monads (
   Reader, Writer, State, Exception, Cont, 
