@@ -32,10 +32,8 @@ To see the available commands try:
 A typical installation might look something like this:
 > runhaskell Setup.hs configure
 > runhaskell Setup.hs build
+> runhaskell Setup.hs haddock -- if you have haddock, else skip
 > runhaskell Setup.hs install
 
-If you have 'haddock' installed you can build the 
-documentations like this:
-> runhaskell Setup.hs haddock
 
 
