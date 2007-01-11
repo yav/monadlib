@@ -5,7 +5,7 @@
 module MonadLib (
   -- * Types
   -- $Types
-  Id, ReaderT, WriterT, StateT, ExceptionT, ContT,
+  Id, Lift, ReaderT, WriterT, StateT, ExceptionT, ContT,
 
   -- * Lifting 
   -- $Lifting
@@ -20,7 +20,7 @@ module MonadLib (
  
   -- ** Eliminating Effects
   -- $Execution
-  runId, runReaderT, runWriterT, runStateT, runExceptionT, runContT, 
+  runId, runLift, runReaderT, runWriterT, runStateT, runExceptionT, runContT, 
 
   -- ** Nested Execution
   -- $Nested_Exec
@@ -37,7 +37,7 @@ import Data.Monoid
 
 -- | The current version of the library.
 version :: (Int,Int,Int)
-version = (3,0,0)
+version = (3,1,0)
 
 
 -- $Types
@@ -48,6 +48,9 @@ version = (3,0,0)
 
 -- | Computations with no effects.
 newtype Id a              = I a                         
+
+-- | Computation with no effects (stritc).
+data Lift a               = Lift a
 
 -- | Add support for propagating a context.
 newtype ReaderT    i m a  = R (i -> m a)                
@@ -79,6 +82,10 @@ newtype ContT      i m a  = C ((a -> m i) -> m i)
 -- | Get the result of a pure computation.
 runId         :: Id a -> a
 runId (I a) = a
+
+-- | Get the result of a pure strict computation.
+runLift       :: Lift a -> a
+runLift (Lift a) = a
 
 -- | Execute a reader computation in the given context.
 runReaderT    :: i -> ReaderT i m a -> m a
@@ -137,6 +144,7 @@ instance BaseM IO IO        where inBase = id
 instance BaseM Maybe Maybe  where inBase = id
 instance BaseM [] []        where inBase = id
 instance BaseM Id Id        where inBase = id
+instance BaseM Lift Lift    where inBase = id
  
 instance (BaseM m n) => BaseM (ReaderT    i m) n where inBase = lift . inBase
 instance (BaseM m n) => BaseM (StateT     i m) n where inBase = lift . inBase
@@ -149,6 +157,12 @@ instance Monad Id where
   return x = I x
   fail x   = error x
   m >>= k  = k (runId m)
+
+
+instance Monad Lift where
+  return x      = Lift x
+  fail x        = error x
+  Lift x >>= k  = k x
 
 -- For the monad transformers, the definition of 'return' 
 -- is completely determined by the 'lift' operations.
@@ -189,6 +203,7 @@ instance (Monad m) => Monad (ContT i m) where
   m >>= k  = C $ \c -> runContT (\a -> runContT c (k a)) m
 
 instance                       Functor Id               where fmap = liftM
+instance                       Functor Lift             where fmap = liftM
 instance (Monad m)          => Functor (ReaderT    i m) where fmap = liftM
 instance (Monad m)          => Functor (StateT     i m) where fmap = liftM
 instance (Monad m,Monoid i) => Functor (WriterT    i m) where fmap = liftM
@@ -206,6 +221,10 @@ instance (Monad m)          => Functor (ContT      i m) where fmap = liftM
 
 instance MonadFix Id where
   mfix f  = let m = f (runId m) in m
+
+-- Does this make sense.
+instance MonadFix Lift where
+  mfix f  = let m = f (runLift m) in m
 
 instance (MonadFix m) => MonadFix (ReaderT i m) where
   mfix f  = R $ \r -> mfix (runReaderT r . f)
