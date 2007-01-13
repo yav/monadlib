@@ -50,7 +50,7 @@ version = (3,1,0)
 newtype Id a              = I a                         
 
 -- | Computation with no effects (stritc).
-data Lift a               = Lift a
+data Lift a               = L a
 
 -- | Add support for propagating a context.
 newtype ReaderT    i m a  = R (i -> m a)                
@@ -85,7 +85,7 @@ runId (I a) = a
 
 -- | Get the result of a pure strict computation.
 runLift       :: Lift a -> a
-runLift (Lift a) = a
+runLift (L a) = a
 
 -- | Execute a reader computation in the given context.
 runReaderT    :: i -> ReaderT i m a -> m a
@@ -160,9 +160,9 @@ instance Monad Id where
 
 
 instance Monad Lift where
-  return x      = Lift x
-  fail x        = error x
-  Lift x >>= k  = k x
+  return x  = L x
+  fail x    = error x
+  L x >>= k = k x
 
 -- For the monad transformers, the definition of 'return' 
 -- is completely determined by the 'lift' operations.
@@ -222,7 +222,6 @@ instance (Monad m)          => Functor (ContT      i m) where fmap = liftM
 instance MonadFix Id where
   mfix f  = let m = f (runId m) in m
 
--- Does this make sense.
 instance MonadFix Lift where
   mfix f  = let m = f (runLift m) in m
 
@@ -458,18 +457,18 @@ instance (Monad m) => RunExceptionM (ExceptionT i m) i where
 -- Some convenient functions for working with continuations.
 
 -- | An explicit representation for continuations that store a value.
-newtype Label m a    = L ((a, Label m a) -> m ())
+newtype Label m a    = Lab ((a, Label m a) -> m ())
 
 -- | Capture the current continuation.  
 -- This function is like 'return', except that it also captures
 -- the current continuation.  Later we can use 'jump' to go back to
 -- the continuation with a possibly different value.
 labelCC            :: (ContM m) => a -> m (a, Label m a)
-labelCC x           = callCC (\k -> return (x, L k))
+labelCC x           = callCC (\k -> return (x, Lab k))
 
 -- | Change the value passed to a previously captured continuation.
 jump               :: (ContM m) => a -> Label m a -> m b
-jump x (L k)        = k (x, L k) >> return unreachable
+jump x (Lab k)      = k (x, Lab k) >> return unreachable
   where unreachable = error "(bug) jump: unreachable"
 
 
