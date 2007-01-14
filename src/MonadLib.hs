@@ -264,7 +264,7 @@ instance (MonadPlus m) => MonadPlus (ExceptionT i m) where
 -- that can be used to define effectful computations.
 
 
--- | Classifies monads that provide access to a context of type 'i'.
+-- | Classifies monads that provide access to a context of type @i@.
 class (Monad m) => ReaderM m i | m -> i where
   -- | Get the context.
   ask :: m i
@@ -279,7 +279,7 @@ instance (ReaderM m j) => ReaderM (ExceptionT i m) j where ask = lift ask
 instance (ReaderM m j) => ReaderM (ContT      i m) j where ask = lift ask
 
 
--- | Classifies monads that can collect values of type 'i'.
+-- | Classifies monads that can collect values of type @i@.
 class (Monad m) => WriterM m i | m -> i where
   -- | Add a value to the collection.
   put  :: i -> m ()
@@ -293,7 +293,7 @@ instance (WriterM m j) => WriterM (ExceptionT i m) j where put = lift . put
 instance (WriterM m j) => WriterM (ContT      i m) j where put = lift . put
 
 
--- | Classifies monads that propagate a state component of type 'i'.
+-- | Classifies monads that propagate a state component of type @i@.
 class (Monad m) => StateM m i | m -> i where
   -- | Get the state. 
   get :: m i
@@ -318,7 +318,7 @@ instance (StateM m j) => StateM (ContT i m) j where
   set = lift . set
 
 
--- | Classifies monads that support raising exceptions of type 'i'.
+-- | Classifies monads that support raising exceptions of type @i@.
 class (Monad m) => ExceptionM m i | m -> i where
   -- | Raise an exception.  
   raise :: i -> m a
@@ -363,7 +363,7 @@ instance (Monad m) => ContM (ContT i m) where
 -- $Nested_Exec
 --
 -- The following classes define operations that are overloaded
--- versions of the 'run' operations.   Unlike the 'run' operations,
+-- versions of the @run@ operations.   Unlike the @run@ operations,
 -- functions do not change the type of the computation (i.e, they
 -- do not remove a layer).  However, they do not perform any
 -- side-effects in the corresponding layer.  Instead, they execute

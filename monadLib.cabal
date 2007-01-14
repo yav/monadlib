@@ -11,7 +11,9 @@ Description:    A collection of monad transformers.
 hs-source-dirs: src
 Build-Depends:  base
 Extra-source-files: LICENSE README
-Exposed-modules: MonadLib Monads
+Exposed-modules: 
+                 MonadLib
+                 Monads
 Extensions:     
   MultiParamTypeClasses, FunctionalDependencies, PolymorphicComponents 
 GHC-options:    -O2 -W -fallow-undecidable-instances
