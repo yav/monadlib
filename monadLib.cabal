@@ -15,6 +15,6 @@ Exposed-modules:
                  MonadLib
                  Monads
 Extensions:     
-  MultiParamTypeClasses, FunctionalDependencies, PolymorphicComponents 
+  MultiParamTypeClasses, FunctionalDependencies
 GHC-options:    -O2 -W -fallow-undecidable-instances
 
