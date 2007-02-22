@@ -4,7 +4,7 @@ License:        BSD3
 License-file:   LICENSE
 Author:         Iavor S. Diatchki
 Maintainer:     diatchki@csee.ogi.edu
-Homepage:       http://www.csee.ogi.edu/~diacthki/monadLib
+Homepage:       http://www.csee.ogi.edu/~diatchki/monadLib
 Category:       Monads
 Synopsis:       A collection of monad transformers.
 Description:    A collection of monad transformers.
