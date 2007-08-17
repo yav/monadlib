@@ -7,7 +7,7 @@ module MonadLib (
   -- $Types
   Id, Lift, ReaderT, WriterT, StateT, ExceptionT, ContT,
 
-  -- * Lifting 
+  -- * Lifting
   -- $Lifting
   MonadT(..), BaseM(..),
 
@@ -17,10 +17,10 @@ module MonadLib (
   Label, labelCC, jump,
 
   -- * Execution
- 
+
   -- ** Eliminating Effects
   -- $Execution
-  runId, runLift, runReaderT, runWriterT, runStateT, runExceptionT, runContT, 
+  runId, runLift, runReaderT, runWriterT, runStateT, runExceptionT, runContT,
 
   -- ** Nested Execution
   -- $Nested_Exec
@@ -41,40 +41,40 @@ version = (3,1,0)
 
 
 -- $Types
--- 
+--
 -- The following types define the representations of the
 -- computation types supported by the library.
 -- Each type adds support for a different effect.
 
 -- | Computations with no effects.
-newtype Id a              = I a                         
+newtype Id a              = I a
 
--- | Computation with no effects (stritc).
+-- | Computation with no effects (strict).
 data Lift a               = L a
 
 -- | Add support for propagating a context.
-newtype ReaderT    i m a  = R (i -> m a)                
+newtype ReaderT    i m a  = R (i -> m a)
 
 -- | Add support for collecting values.
-newtype WriterT    i m a  = W (m (a,i))            
+newtype WriterT    i m a  = W (m (a,i))
 
 -- | Add support for threading state.
-newtype StateT     i m a  = S (i -> m (a,i))           
+newtype StateT     i m a  = S (i -> m (a,i))
 
 -- | Add support for exceptions.
-newtype ExceptionT i m a  = X (m (Either i a))          
+newtype ExceptionT i m a  = X (m (Either i a))
 
 -- | Add support for jumps.
-newtype ContT      i m a  = C ((a -> m i) -> m i)       
+newtype ContT      i m a  = C ((a -> m i) -> m i)
 
 
 
 -- $Execution
--- 
+--
 -- The following functions eliminate the outermost effect
 -- of a computation by translating a computation into an
--- equivalent computation in the underlying monad.  
--- (The exception is 'Id' which is not a monad transformer 
+-- equivalent computation in the underlying monad.
+-- (The exception is 'Id' which is not a monad transformer
 -- but an ordinary monad, and so, its run operation simply
 -- eliminates the monad.)
 
@@ -102,7 +102,7 @@ runStateT     :: i -> StateT i m a -> m (a,i)
 runStateT i (S m) = m i
 
 -- | Execute a computation with exceptions.
--- Successful results are tagged with 'Right', 
+-- Successful results are tagged with 'Right',
 -- exceptional results are tagged with 'Left'.
 runExceptionT :: ExceptionT i m a -> m (Either i a)
 runExceptionT (X m) = m
@@ -114,11 +114,11 @@ runContT i (C m) = m i
 
 
 -- $Lifting
--- 
+--
 -- The following operations allow us to promote computations
 -- in the underlying monad to computations that support an extra
 -- effect.  Computations defined in this way do not make use of
--- the new effect but can be combined with other operations that 
+-- the new effect but can be combined with other operations that
 -- utilize the effect.
 
 class MonadT t where
@@ -130,7 +130,7 @@ class MonadT t where
 
 instance MonadT (ReaderT    i) where lift m = R (\_ -> m)
 instance MonadT (StateT     i) where lift m = S (\s -> liftM (\a -> (a,s)) m)
-instance (Monoid i) => 
+instance (Monoid i) =>
          MonadT (WriterT    i) where lift m = W (liftM (\a -> (a,mempty)) m)
 instance MonadT (ExceptionT i) where lift m = X (liftM Right m)
 instance MonadT (ContT      i) where lift m = C (m >>=)
@@ -139,16 +139,17 @@ instance MonadT (ContT      i) where lift m = C (m >>=)
 class (Monad m, Monad n) => BaseM m n | m -> n where
   -- | Promote a computation from the base monad.
   inBase :: n a -> m a
- 
+
 instance BaseM IO IO        where inBase = id
 instance BaseM Maybe Maybe  where inBase = id
 instance BaseM [] []        where inBase = id
 instance BaseM Id Id        where inBase = id
 instance BaseM Lift Lift    where inBase = id
- 
+
 instance (BaseM m n) => BaseM (ReaderT    i m) n where inBase = lift . inBase
 instance (BaseM m n) => BaseM (StateT     i m) n where inBase = lift . inBase
-instance (BaseM m n,Monoid i) => BaseM (WriterT    i m) n where inBase = lift . inBase
+instance (BaseM m n,Monoid i) =>
+                        BaseM (WriterT    i m) n where inBase = lift . inBase
 instance (BaseM m n) => BaseM (ExceptionT i m) n where inBase = lift . inBase
 instance (BaseM m n) => BaseM (ContT      i m) n where inBase = lift . inBase
 
@@ -164,7 +165,7 @@ instance Monad Lift where
   fail x    = error x
   L x >>= k = k x
 
--- For the monad transformers, the definition of 'return' 
+-- For the monad transformers, the definition of 'return'
 -- is completely determined by the 'lift' operations.
 
 -- None of the transformers make essential use of the 'fail' method.
@@ -173,26 +174,26 @@ instance Monad Lift where
 instance (Monad m) => Monad (ReaderT i m) where
   return x = lift (return x)
   fail x   = lift (fail x)
-  m >>= k  = R $ \r -> runReaderT r m >>= \a -> 
+  m >>= k  = R $ \r -> runReaderT r m >>= \a ->
                        runReaderT r (k a)
 
 instance (Monad m) => Monad (StateT i m) where
   return x = lift (return x)
   fail x   = lift (fail x)
-  m >>= k  = S $ \s -> runStateT s  m >>= \ ~(a,s') -> 
+  m >>= k  = S $ \s -> runStateT s  m >>= \ ~(a,s') ->
                        runStateT s' (k a)
 
 instance (Monad m,Monoid i) => Monad (WriterT i m) where
   return x = lift (return x)
   fail x   = lift (fail x)
-  m >>= k  = W $ runWriterT m     >>= \ ~(a,w1) -> 
-                 runWriterT (k a) >>= \ ~(b,w2) -> 
+  m >>= k  = W $ runWriterT m     >>= \ ~(a,w1) ->
+                 runWriterT (k a) >>= \ ~(b,w2) ->
                  return (b,mappend w1 w2)
 
 instance (Monad m) => Monad (ExceptionT i m) where
   return x = lift (return x)
   fail x   = lift (fail x)
-  m >>= k  = X $ runExceptionT m >>= \a -> 
+  m >>= k  = X $ runExceptionT m >>= \a ->
                  case a of
                    Left x  -> return (Left x)
                    Right a -> runExceptionT (k a)
@@ -212,11 +213,11 @@ instance (Monad m)          => Functor (ContT      i m) where fmap = liftM
 
 
 -- $Monadic_Value_Recursion
--- 
+--
 -- Recursion that does not duplicate side-effects.
 -- For details see Levent Erkok's dissertation.
--- 
--- Monadic types built with 'ContT' do not support 
+--
+-- Monadic types built with 'ContT' do not support
 -- monadic value recursion.
 
 instance MonadFix Id where
@@ -244,11 +245,11 @@ instance (MonadFix m) => MonadFix (ExceptionT i m) where
 instance (MonadPlus m) => MonadPlus (ReaderT i m) where
   mzero             = lift mzero
   mplus (R m) (R n) = R (\r -> mplus (m r) (n r))
- 
+
 instance (MonadPlus m) => MonadPlus (StateT i m) where
   mzero             = lift mzero
   mplus (S m) (S n) = S (\s -> mplus (m s) (n s))
- 
+
 instance (MonadPlus m,Monoid i) => MonadPlus (WriterT i m) where
   mzero             = lift mzero
   mplus (W m) (W n) = W (mplus m n)
@@ -259,7 +260,7 @@ instance (MonadPlus m) => MonadPlus (ExceptionT i m) where
 
 
 -- $Effects
--- 
+--
 -- The following classes define overloaded operations
 -- that can be used to define effectful computations.
 
@@ -272,7 +273,7 @@ class (Monad m) => ReaderM m i | m -> i where
 instance (Monad m) => ReaderM (ReaderT i m) i where
   ask = R return
 
-instance (ReaderM m j,Monoid i) 
+instance (ReaderM m j,Monoid i)
                        => ReaderM (WriterT    i m) j where ask = lift ask
 instance (ReaderM m j) => ReaderM (StateT     i m) j where ask = lift ask
 instance (ReaderM m j) => ReaderM (ExceptionT i m) j where ask = lift ask
@@ -284,7 +285,7 @@ class (Monad m) => WriterM m i | m -> i where
   -- | Add a value to the collection.
   put  :: i -> m ()
 
-instance (Monad m,Monoid i) => WriterM (WriterT i m) i where 
+instance (Monad m,Monoid i) => WriterM (WriterT i m) i where
   put x = W (return ((),x))
 
 instance (WriterM m j) => WriterM (ReaderT    i m) j where put = lift . put
@@ -295,7 +296,7 @@ instance (WriterM m j) => WriterM (ContT      i m) j where put = lift . put
 
 -- | Classifies monads that propagate a state component of type @i@.
 class (Monad m) => StateM m i | m -> i where
-  -- | Get the state. 
+  -- | Get the state.
   get :: m i
   -- | Set the state.
   set :: i -> m ()
@@ -306,7 +307,7 @@ instance (Monad m) => StateM (StateT i m) i where
 
 instance (StateM m j) => StateM (ReaderT i m) j where
   get = lift get
-  set = lift . set 
+  set = lift . set
 instance (StateM m j,Monoid i) => StateM (WriterT i m) j where
   get = lift get
   set = lift . set
@@ -320,11 +321,11 @@ instance (StateM m j) => StateM (ContT i m) j where
 
 -- | Classifies monads that support raising exceptions of type @i@.
 class (Monad m) => ExceptionM m i | m -> i where
-  -- | Raise an exception.  
+  -- | Raise an exception.
   raise :: i -> m a
 
-instance (Monad m) => ExceptionM (ExceptionT i m) i where 
-  raise x = X (return (Left x)) 
+instance (Monad m) => ExceptionM (ExceptionT i m) i where
+  raise x = X (return (Left x))
 
 instance (ExceptionM m j) => ExceptionM (ReaderT i m) j where
   raise = lift . raise
@@ -352,10 +353,10 @@ instance (ContM m) => ContM (StateT i m) where
 
 instance (ContM m,Monoid i) => ContM (WriterT i m) where
   callCC f = W $ callCC $ \k -> runWriterT $ f $ \a -> lift $ k (a,mempty)
- 
+
 instance (ContM m) => ContM (ExceptionT i m) where
   callCC f = X $ callCC $ \k -> runExceptionT $ f $ \a -> lift $ k $ Right a
-   
+
 instance (Monad m) => ContM (ContT i m) where
   callCC f = C $ \k -> runContT k $ f $ \a -> C $ \_ -> k a
 
@@ -368,7 +369,7 @@ instance (Monad m) => ContM (ContT i m) where
 -- do not remove a layer).  However, they do not perform any
 -- side-effects in the corresponding layer.  Instead, they execute
 -- a computation in a ``separate thread'' with respect to the
--- corresponding effect.  
+-- corresponding effect.
 
 -- | Classifies monads that support changing the context for a
 -- sub-computation.
@@ -385,10 +386,10 @@ instance (RunReaderM m j) => RunReaderM (StateT     i m) j where
 instance (RunReaderM m j) => RunReaderM (ExceptionT i m) j where
   local i (X m) = X (local i m)
 
--- | Classifies monads that support collecting the output of 
+-- | Classifies monads that support collecting the output of
 -- a sub-computation.
 class WriterM m i => RunWriterM m i | m -> i where
-  -- | Collect the output from a computation.   
+  -- | Collect the output from a computation.
   collect :: m a -> m (a,i)
 
 instance (RunWriterM m j) => RunWriterM (ReaderT i m) j where
@@ -404,7 +405,7 @@ instance (RunWriterM m j) => RunWriterM (StateT i m) j where
 instance (RunWriterM m j) => RunWriterM (ExceptionT i m) j where
   collect (X m) = X (liftM swap (collect m))
     where swap (Right a,w)  = Right (a,w)
-          swap (Left x,_)   = Left x    
+          swap (Left x,_)   = Left x
     -- NOTE: If the local computation fails, then the output
     -- is discarded because the result type cannot accommodate it.
 
@@ -413,7 +414,7 @@ instance (RunWriterM m j) => RunWriterM (ExceptionT i m) j where
 class (StateM m i) => RunStateM m i | m -> i where
   -- | Modify the state for the duration of a computation.
   -- Returns the final state.
-  runS :: i -> m a -> m (a,i)   
+  runS :: i -> m a -> m (a,i)
 
 instance (RunStateM m j) => RunStateM (ReaderT i m) j where
   runS s (R m)  = R (runS s . m)
@@ -427,7 +428,7 @@ instance (Monad m) => RunStateM (StateT i m) i where
 
 instance (RunStateM m j) => RunStateM (ExceptionT i m) j where
   runS s (X m)  = X (liftM swap (runS s m))
-    where swap (Left e,_)   = Left e    
+    where swap (Left e,_)   = Left e
           swap (Right a,s)  = Right (a,s)
     -- NOTE: If the local computation fails, then the modifications
     -- are discarded because the result type cannot accommodate it.
@@ -435,19 +436,19 @@ instance (RunStateM m j) => RunStateM (ExceptionT i m) j where
 -- | Classifies monads that support handling of exceptions.
 class ExceptionM m i => RunExceptionM m i | m -> i where
   -- | Exceptions are explicit in the result.
-  try :: m a -> m (Either i a)  
+  try :: m a -> m (Either i a)
 
 instance (RunExceptionM m i) => RunExceptionM (ReaderT j m) i where
   try (R m) = R (try . m)
 
 instance (RunExceptionM m i,Monoid j) => RunExceptionM (WriterT j m) i where
   try (W m) = W (liftM swap (try m))
-    where swap (Right ~(a,w)) = (Right a,w)  
+    where swap (Right ~(a,w)) = (Right a,w)
           swap (Left e)       = (Left e, mempty)
 
 instance (RunExceptionM m i) => RunExceptionM (StateT j m) i where
   try (S m) = S (\s -> liftM (swap s) (try (m s)))
-    where swap _ (Right ~(a,s)) = (Right a,s)  
+    where swap _ (Right ~(a,s)) = (Right a,s)
           swap s (Left e)       = (Left e, s)
 
 instance (Monad m) => RunExceptionM (ExceptionT i m) i where
@@ -459,7 +460,7 @@ instance (Monad m) => RunExceptionM (ExceptionT i m) i where
 -- | An explicit representation for continuations that store a value.
 newtype Label m a    = Lab ((a, Label m a) -> m ())
 
--- | Capture the current continuation.  
+-- | Capture the current continuation
 -- This function is like 'return', except that it also captures
 -- the current continuation.  Later we can use 'jump' to go back to
 -- the continuation with a possibly different value.
