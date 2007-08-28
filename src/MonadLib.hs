@@ -34,10 +34,11 @@ module MonadLib (
 import Control.Monad
 import Control.Monad.Fix
 import Data.Monoid
+import Prelude hiding (Ordering(..))
 
 -- | The current version of the library.
 version :: (Int,Int,Int)
-version = (3,1,0)
+version = (3,2,0)
 
 
 -- $Types
@@ -51,6 +52,12 @@ newtype Id a              = I a
 
 -- | Computation with no effects (strict).
 data Lift a               = L a
+
+-- | Adds nothing.  Useful as a placeholder.
+newtype IdT m a           = IT (m a)
+
+-- | Adds nothing (strict). Useful as a placeholder.
+data LiftT m a            = LT (m a)
 
 -- | Add support for propagating a context.
 newtype ReaderT    i m a  = R (i -> m a)
@@ -86,6 +93,15 @@ runId (I a) = a
 -- | Get the result of a pure strict computation.
 runLift       :: Lift a -> a
 runLift (L a) = a
+
+
+-- | Remove an identity layer.
+runIdT        :: IdT m a -> m a
+runIdT (IT a)  = a
+
+-- | Remove a strict identity layer.
+runLiftT       :: LiftT m a -> m a
+runLiftT (LT a) = a
 
 -- | Execute a reader computation in the given context.
 runReaderT    :: i -> ReaderT i m a -> m a
@@ -128,6 +144,8 @@ class MonadT t where
 -- It is interesting to note that these use something the resembles
 -- the non-transformer 'return's.
 
+instance MonadT IdT            where lift m = IT m
+instance MonadT LiftT          where lift m = LT m
 instance MonadT (ReaderT    i) where lift m = R (\_ -> m)
 instance MonadT (StateT     i) where lift m = S (\s -> liftM (\a -> (a,s)) m)
 instance (Monoid i) =>
@@ -146,6 +164,8 @@ instance BaseM [] []        where inBase = id
 instance BaseM Id Id        where inBase = id
 instance BaseM Lift Lift    where inBase = id
 
+instance (BaseM m n) => BaseM (IdT          m) n where inBase = lift . inBase
+instance (BaseM m n) => BaseM (LiftT        m) n where inBase = lift . inBase
 instance (BaseM m n) => BaseM (ReaderT    i m) n where inBase = lift . inBase
 instance (BaseM m n) => BaseM (StateT     i m) n where inBase = lift . inBase
 instance (BaseM m n,Monoid i) =>
@@ -170,6 +190,16 @@ instance Monad Lift where
 
 -- None of the transformers make essential use of the 'fail' method.
 -- Instead they delegate its behavior to the underlying monad.
+
+instance (Monad m) => Monad (IdT m) where
+  return x    = lift (return x)
+  fail x      = lift (fail x)
+  m >>= k     = IT (runIdT m >>= (runIdT . k))
+
+instance (Monad m) => Monad (LiftT m) where
+  return x    = lift (return x)
+  fail x      = lift (fail x)
+  LT m >>= k  = LT (m >>= (runLiftT . k))
 
 instance (Monad m) => Monad (ReaderT i m) where
   return x = lift (return x)
@@ -205,6 +235,8 @@ instance (Monad m) => Monad (ContT i m) where
 
 instance                       Functor Id               where fmap = liftM
 instance                       Functor Lift             where fmap = liftM
+instance (Monad m)          => Functor (IdT          m) where fmap = liftM
+instance (Monad m)          => Functor (LiftT        m) where fmap = liftM
 instance (Monad m)          => Functor (ReaderT    i m) where fmap = liftM
 instance (Monad m)          => Functor (StateT     i m) where fmap = liftM
 instance (Monad m,Monoid i) => Functor (WriterT    i m) where fmap = liftM
@@ -226,6 +258,12 @@ instance MonadFix Id where
 instance MonadFix Lift where
   mfix f  = let m = f (runLift m) in m
 
+instance (MonadFix m) => MonadFix (IdT m) where
+  mfix f  = IT (mfix (runIdT . f))
+
+instance (MonadFix m) => MonadFix (LiftT m) where
+  mfix f  = LT (mfix (runLiftT . f))
+
 instance (MonadFix m) => MonadFix (ReaderT i m) where
   mfix f  = R $ \r -> mfix (runReaderT r . f)
 
@@ -241,6 +279,14 @@ instance (MonadFix m) => MonadFix (ExceptionT i m) where
           fromRight _         = error "ExceptionT: mfix looped."
 
 
+
+instance (MonadPlus m) => MonadPlus (IdT m) where
+  mzero               = lift mzero
+  mplus (IT m) (IT n) = IT (mplus m n)
+
+instance (MonadPlus m) => MonadPlus (LiftT m) where
+  mzero               = lift mzero
+  mplus (LT m) (LT n) = LT (mplus m n)
 
 instance (MonadPlus m) => MonadPlus (ReaderT i m) where
   mzero             = lift mzero
@@ -273,6 +319,8 @@ class (Monad m) => ReaderM m i | m -> i where
 instance (Monad m) => ReaderM (ReaderT i m) i where
   ask = R return
 
+instance (ReaderM m j) => ReaderM (IdT          m) j where ask = lift ask
+instance (ReaderM m j) => ReaderM (LiftT        m) j where ask = lift ask
 instance (ReaderM m j,Monoid i)
                        => ReaderM (WriterT    i m) j where ask = lift ask
 instance (ReaderM m j) => ReaderM (StateT     i m) j where ask = lift ask
@@ -288,6 +336,8 @@ class (Monad m) => WriterM m i | m -> i where
 instance (Monad m,Monoid i) => WriterM (WriterT i m) i where
   put x = W (return ((),x))
 
+instance (WriterM m j) => WriterM (IdT          m) j where put = lift . put
+instance (WriterM m j) => WriterM (LiftT        m) j where put = lift . put
 instance (WriterM m j) => WriterM (ReaderT    i m) j where put = lift . put
 instance (WriterM m j) => WriterM (StateT     i m) j where put = lift . put
 instance (WriterM m j) => WriterM (ExceptionT i m) j where put = lift . put
@@ -305,6 +355,12 @@ instance (Monad m) => StateM (StateT i m) i where
   get   = S (\s -> return (s,s))
   set s = S (\_ -> return ((),s))
 
+instance (StateM m j) => StateM (IdT m) j where
+  get = lift get
+  set = lift . set
+instance (StateM m j) => StateM (LiftT m) j where
+  get = lift get
+  set = lift . set
 instance (StateM m j) => StateM (ReaderT i m) j where
   get = lift get
   set = lift . set
@@ -327,6 +383,10 @@ class (Monad m) => ExceptionM m i | m -> i where
 instance (Monad m) => ExceptionM (ExceptionT i m) i where
   raise x = X (return (Left x))
 
+instance (ExceptionM m j) => ExceptionM (IdT m) j where
+  raise = lift . raise
+instance (ExceptionM m j) => ExceptionM (LiftT m) j where
+  raise = lift . raise
 instance (ExceptionM m j) => ExceptionM (ReaderT i m) j where
   raise = lift . raise
 instance (ExceptionM m j,Monoid i) => ExceptionM (WriterT i m) j where
@@ -344,6 +404,12 @@ instance (ExceptionM m j) => ExceptionM (ContT   i m) j where
 class Monad m => ContM m where
   -- | Capture the current continuation.
   callCC :: ((a -> m b) -> m a) -> m a
+
+instance (ContM m) => ContM (IdT m) where
+  callCC f = IT $ callCC $ \k -> runIdT $ f $ \a -> lift $ k a
+
+instance (ContM m) => ContM (LiftT m) where
+  callCC f = LT $ callCC $ \k -> runLiftT $ f $ \a -> lift $ k a
 
 instance (ContM m) => ContM (ReaderT i m) where
   callCC f = R $ \r -> callCC $ \k -> runReaderT r $ f $ \a -> lift $ k a
@@ -379,6 +445,11 @@ class (ReaderM m i) => RunReaderM m i | m -> i where
 
 instance (Monad m)        => RunReaderM (ReaderT    i m) i where
   local i m     = lift (runReaderT i m)
+
+instance (RunReaderM m j) => RunReaderM (IdT m) j where
+  local i (IT m) = IT (local i m)
+instance (RunReaderM m j) => RunReaderM (LiftT m) j where
+  local i (LT m) = LT (local i m)
 instance (RunReaderM m j,Monoid i) => RunReaderM (WriterT i m) j where
   local i (W m) = W (local i m)
 instance (RunReaderM m j) => RunReaderM (StateT     i m) j where
@@ -391,6 +462,12 @@ instance (RunReaderM m j) => RunReaderM (ExceptionT i m) j where
 class WriterM m i => RunWriterM m i | m -> i where
   -- | Collect the output from a computation.
   collect :: m a -> m (a,i)
+
+instance (RunWriterM m j) => RunWriterM (IdT m) j where
+  collect (IT m) = IT (collect m)
+
+instance (RunWriterM m j) => RunWriterM (LiftT m) j where
+  collect (LT m) = LT (collect m)
 
 instance (RunWriterM m j) => RunWriterM (ReaderT i m) j where
   collect (R m) = R (collect . m)
@@ -416,6 +493,12 @@ class (StateM m i) => RunStateM m i | m -> i where
   -- Returns the final state.
   runS :: i -> m a -> m (a,i)
 
+instance (RunStateM m j) => RunStateM (IdT m) j where
+  runS s (IT m)  = IT (runS s m)
+
+instance (RunStateM m j) => RunStateM (LiftT m) j where
+  runS s (LT m)  = LT (runS s m)
+
 instance (RunStateM m j) => RunStateM (ReaderT i m) j where
   runS s (R m)  = R (runS s . m)
 
@@ -437,6 +520,12 @@ instance (RunStateM m j) => RunStateM (ExceptionT i m) j where
 class ExceptionM m i => RunExceptionM m i | m -> i where
   -- | Exceptions are explicit in the result.
   try :: m a -> m (Either i a)
+
+instance (RunExceptionM m i) => RunExceptionM (IdT m) i where
+  try (IT m) = IT (try m)
+
+instance (RunExceptionM m i) => RunExceptionM (LiftT m) i where
+  try (LT m) = LT (try m)
 
 instance (RunExceptionM m i) => RunExceptionM (ReaderT j m) i where
   try (R m) = R (try . m)
