@@ -27,7 +27,7 @@ module MonadLib (
   -- $Nested_Exec
   RunReaderM(..), RunWriterM(..), RunExceptionM(..),
 
-  -- * Automatically deriving functionality
+  -- * Deriving functions
   Iso(..), derive_fmap, derive_return, derive_bind, derive_fail, derive_mfix,
   derive_ask, derive_put, derive_get, derive_set, derive_raise, derive_callCC,
   derive_local, derive_collect, derive_try,
@@ -84,9 +84,9 @@ newtype ContT      i m a  = C ((a -> m i) -> m i)
 -- The following functions eliminate the outermost effect
 -- of a computation by translating a computation into an
 -- equivalent computation in the underlying monad.
--- (The exception is 'Id' which is not a monad transformer
--- but an ordinary monad, and so, its run operation simply
--- eliminates the monad.)
+-- (The exceptions are 'Id' and 'Lift' which are not transformers
+-- but ordinary monas and so, their run operations simply
+-- eliminate the monad.)
 
 
 -- | Get the result of a pure computation.
