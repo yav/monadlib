@@ -519,30 +519,39 @@ derive_fail iso a = close iso (fail a)
 derive_mfix :: (MonadFix m) => Iso m n -> (a -> n a) -> n a
 derive_mfix iso f = close iso (mfix (open iso . f))
 
+-- | Derive the implementation of 'ask' from 'ReaderM'.
 derive_ask :: (ReaderM m i) => Iso m n -> n i
 derive_ask iso = close iso ask
 
+-- | Derive the implementation of 'put' from 'WriterM'.
 derive_put :: (WriterM m i) => Iso m n -> i -> n ()
 derive_put iso x = close iso (put x)
 
+-- | Derive the implementation of 'get' from 'StateM'.
 derive_get :: (StateM m i) => Iso m n -> n i
 derive_get iso = close iso get
 
+-- | Derive the implementation of 'set' from 'StateM'.
 derive_set :: (StateM m i) => Iso m n -> i -> n ()
 derive_set iso x = close iso (set x)
 
+-- | Derive the implementation of 'raise' from 'ExceptionM'.
 derive_raise :: (ExceptionM m i) => Iso m n -> i -> n a
 derive_raise iso x = close iso (raise x)
 
+-- | Derive the implementation of 'callCC' from 'ContM'.
 derive_callCC :: (ContM m) => Iso m n -> ((a -> n b) -> n a) -> n a
 derive_callCC iso f = close iso (callCC (open iso . f . (close iso .)))
 
+-- | Derive the implementation of 'local' from 'RunReaderM'.
 derive_local :: (RunReaderM m i) => Iso m n -> i -> n a -> n a
 derive_local iso i = close iso . local i . open iso
 
+-- | Derive the implementation of 'collect' from 'RunWriterM'.
 derive_collect :: (RunWriterM m i) => Iso m n -> n a -> n (a,i)
 derive_collect iso = close iso . collect . open iso
 
+-- | Derive the implementation of 'try' from 'RunExceptionM'.
 derive_try :: (RunExceptionM m i) => Iso m n -> n a -> n (Either i a)
 derive_try iso = close iso . try . open iso
 
