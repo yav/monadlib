@@ -1,0 +1,7 @@
+Version 3.3.0
+
+* Remove 'RunStateM'
+  Simplifies the library without loosing functionality.
+  It seems that we can get the same behavior by just using 'get' and 'set'.
+
+* Add functions to derive the methods in the library for isomorphic types.
