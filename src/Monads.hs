@@ -83,7 +83,6 @@ runException = runId . runExceptionT         . unX
 runCont   i  = runId . runContT (return . i) . unC 
 
 instance RunReaderM (Reader i) i where local i = R' . local i . unR
-instance RunStateM (State i) i where runS i  = S' . runS i  . unS
 instance (Monoid i) => RunWriterM (Writer i) i where
   collect = W' . collect . unW
 instance RunExceptionM (Exception i) i where try = X' . try     . unX

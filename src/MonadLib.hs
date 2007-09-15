@@ -25,7 +25,7 @@ module MonadLib (
 
   -- ** Nested Execution
   -- $Nested_Exec
-  RunReaderM(..), RunWriterM(..), RunStateM(..), RunExceptionM(..),
+  RunReaderM(..), RunWriterM(..), RunExceptionM(..),
 
   -- * Miscellaneous
   version,
@@ -446,32 +446,6 @@ instance (RunWriterM m j) => RunWriterM (ExceptionT i m) j where
     -- NOTE: If the local computation fails, then the output
     -- is discarded because the result type cannot accommodate it.
 
-
--- | Classifies monads that support separate state threads.
-class (StateM m i) => RunStateM m i | m -> i where
-  -- | Modify the state for the duration of a computation.
-  -- Returns the final state.
-  runS :: i -> m a -> m (a,i)
-
-instance (RunStateM m j) => RunStateM (IdT m) j where
-  runS s (IT m)  = IT (runS s m)
-
-instance (RunStateM m j) => RunStateM (ReaderT i m) j where
-  runS s (R m)  = R (runS s . m)
-
-instance (RunStateM m j,Monoid i) => RunStateM (WriterT i m) j where
-  runS s (W m)  = W (liftM swap (runS s m))
-    where swap (~(a,s),w) = ((a,w),s)
-
-instance (Monad m) => RunStateM (StateT i m) i where
-  runS s m  = lift (runStateT s m)
-
-instance (RunStateM m j) => RunStateM (ExceptionT i m) j where
-  runS s (X m)  = X (liftM swap (runS s m))
-    where swap (Left e,_)   = Left e
-          swap (Right a,s)  = Right (a,s)
-    -- NOTE: If the local computation fails, then the modifications
-    -- are discarded because the result type cannot accommodate it.
 
 -- | Classifies monads that support handling of exceptions.
 class ExceptionM m i => RunExceptionM m i | m -> i where
