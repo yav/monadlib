@@ -31,6 +31,7 @@ module MonadLib (
   Iso(..), derive_fmap, derive_return, derive_bind, derive_fail, derive_mfix,
   derive_ask, derive_put, derive_get, derive_set, derive_raise, derive_callCC,
   derive_local, derive_collect, derive_try,
+  derive_lift, derive_inBase,
 
   -- * Miscellaneous
   version,
@@ -555,4 +556,9 @@ derive_collect iso = close iso . collect . open iso
 derive_try :: (RunExceptionM m i) => Iso m n -> n a -> n (Either i a)
 derive_try iso = close iso . try . open iso
 
+derive_lift :: (MonadT t, Monad m) => Iso (t m) n -> m a -> n a
+derive_lift iso m = close iso (lift m)
+
+derive_inBase :: (BaseM m x) => Iso m n -> x a -> n a
+derive_inBase iso m = close iso (inBase m)
 
