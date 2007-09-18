@@ -4,13 +4,13 @@ License:        BSD3
 License-file:   LICENSE
 Author:         Iavor S. Diatchki
 Maintainer:     diatchki@galois.com
-Homepage:       http://www.csee.ogi.edu/~diatchki/monadLib
+Homepage:       http://www.galois.com/~diatchki/monadLib
 Category:       Monads
 Synopsis:       A collection of monad transformers.
 Description:    A collection of monad transformers.
 hs-source-dirs: src
 Build-Depends:  base
-Extra-source-files: LICENSE README, CHANGES
+Extra-source-files: LICENSE, README, CHANGES
 Exposed-modules: MonadLib, Monads
 Extensions:
   MultiParamTypeClasses, FunctionalDependencies, Rank2Types
