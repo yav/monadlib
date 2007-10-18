@@ -5,7 +5,7 @@
 module MonadLib (
   -- * Types
   -- $Types
-  Id, Lift, IdT, ReaderT, WriterT, StateT, ExceptionT, ContT,
+  Id, Lift, IdT, ReaderT, WriterT, StateT, ExceptionT, ChoiceT, ContT,
 
   -- * Lifting
   -- $Lifting
@@ -22,6 +22,7 @@ module MonadLib (
   -- $Execution
   runId, runLift,
   runIdT, runReaderT, runWriterT, runStateT, runExceptionT, runContT,
+  runChoiceT, findOne, findAll,
 
   -- ** Nested Execution
   -- $Nested_Exec
@@ -31,6 +32,7 @@ module MonadLib (
   Iso(..), derive_fmap, derive_return, derive_bind, derive_fail, derive_mfix,
   derive_ask, derive_put, derive_get, derive_set, derive_raise, derive_callCC,
   derive_local, derive_collect, derive_try,
+  derive_mzero, derive_mplus,
   derive_lift, derive_inBase,
 
   -- * Miscellaneous
@@ -45,7 +47,7 @@ import Prelude hiding (Ordering(..))
 
 -- | The current version of the library.
 version :: (Int,Int,Int)
-version = (3,3,0)
+version = (3,4,0)
 
 
 -- $Types
@@ -74,6 +76,12 @@ newtype StateT     i m a  = S (i -> m (a,i))
 
 -- | Add support for exceptions.
 newtype ExceptionT i m a  = X (m (Either i a))
+
+-- | Add support for multiple answers.
+data ChoiceT m a          = NoAnswer
+                          | Answer a
+                          | Choice (ChoiceT m a) (ChoiceT m a)
+                          | ChoiceEff (m (ChoiceT m a))
 
 -- | Add support for jumps.
 newtype ContT      i m a  = C ((a -> m i) -> m i)
@@ -123,6 +131,34 @@ runStateT i (S m) = m i
 runExceptionT :: ExceptionT i m a -> m (Either i a)
 runExceptionT (X m) = m
 
+-- | Execute a computation that may return multiple answers.
+-- The resulting computation computation returns 'Nothing'
+-- if no answers were found, or @Just (answer,new_comp)@,
+-- where @answer@ is an answer, and @new_comp@ is a computation
+-- that may produce more answers.
+-- The search is depth-first and left-biased with respect to the
+-- 'mplus' operation.
+runChoiceT :: (Monad m) => ChoiceT m a -> m (Maybe (a,ChoiceT m a))
+runChoiceT (Answer a)     = return (Just (a,NoAnswer))
+runChoiceT NoAnswer       = return Nothing
+runChoiceT (Choice l r)   = do x <- runChoiceT l
+                               case x of
+                                 Nothing      -> runChoiceT r
+                                 Just (a,l1)  -> return (Just (a,Choice l1 r))
+runChoiceT (ChoiceEff m)  = runChoiceT =<< m
+
+-- | Execute a computation that may return multiple answers,
+-- returning at most one answer.
+findOne :: (Monad m) => ChoiceT m a -> m (Maybe a)
+findOne m = fmap fst `liftM` runChoiceT m
+
+-- | Executie a computation that may return multiple answers,
+-- collecting all possible answers.
+findAll :: (Monad m) => ChoiceT m a -> m [a]
+findAll m = all =<< runChoiceT m
+  where all Nothing       = return []
+        all (Just (a,as)) = (a:) `liftM` findAll as
+
 -- | Execute a computation with the given continuation.
 runContT      :: (a -> m i) -> ContT i m a -> m i
 runContT i (C m) = m i
@@ -150,6 +186,7 @@ instance MonadT (StateT     i) where lift m = S (\s -> liftM (\a -> (a,s)) m)
 instance (Monoid i) =>
          MonadT (WriterT    i) where lift m = W (liftM (\a -> (a,mempty)) m)
 instance MonadT (ExceptionT i) where lift m = X (liftM Right m)
+instance MonadT ChoiceT        where lift m = ChoiceEff (liftM Answer m)
 instance MonadT (ContT      i) where lift m = C (m >>=)
 
 
@@ -169,6 +206,7 @@ instance (BaseM m n) => BaseM (StateT     i m) n where inBase = lift . inBase
 instance (BaseM m n,Monoid i) =>
                         BaseM (WriterT    i m) n where inBase = lift . inBase
 instance (BaseM m n) => BaseM (ExceptionT i m) n where inBase = lift . inBase
+instance (BaseM m n) => BaseM (ChoiceT      m) n where inBase = lift . inBase
 instance (BaseM m n) => BaseM (ContT      i m) n where inBase = lift . inBase
 
 
@@ -219,6 +257,15 @@ instance (Monad m) => Monad (ExceptionT i m) where
                    Left x  -> return (Left x)
                    Right a -> runExceptionT (k a)
 
+instance (Monad m) => Monad (ChoiceT m) where
+  return x  = Answer x
+  fail x    = lift (fail x)
+
+  Answer a  >>= k     = k a
+  NoAnswer >>= _      = NoAnswer
+  Choice m1 m2 >>= k  = Choice (m1 >>= k) (m2 >>= k)
+  ChoiceEff m >>= k   = ChoiceEff (liftM (>>= k) m)
+
 instance (Monad m) => Monad (ContT i m) where
   return x = lift (return x)
   fail x   = lift (fail x)
@@ -231,6 +278,7 @@ instance (Monad m)          => Functor (ReaderT    i m) where fmap = liftM
 instance (Monad m)          => Functor (StateT     i m) where fmap = liftM
 instance (Monad m,Monoid i) => Functor (WriterT    i m) where fmap = liftM
 instance (Monad m)          => Functor (ExceptionT i m) where fmap = liftM
+instance (Monad m)          => Functor (ChoiceT      m) where fmap = liftM
 instance (Monad m)          => Functor (ContT      i m) where fmap = liftM
 
 
@@ -260,11 +308,14 @@ instance (MonadFix m) => MonadFix (StateT i m) where
 instance (MonadFix m,Monoid i) => MonadFix (WriterT i m) where
   mfix f  = W $ mfix (runWriterT . f . fst)
 
+-- No instance for ChoiceT
+
 instance (MonadFix m) => MonadFix (ExceptionT i m) where
   mfix f  = X $ mfix (runExceptionT . f . fromRight)
     where fromRight (Right a) = a
           fromRight _         = error "ExceptionT: mfix looped."
 
+-- No instance for ContT
 
 
 instance (MonadPlus m) => MonadPlus (IdT m) where
@@ -287,6 +338,15 @@ instance (MonadPlus m) => MonadPlus (ExceptionT i m) where
   mzero             = lift mzero
   mplus (X m) (X n) = X (mplus m n)
 
+instance (Monad m) => MonadPlus (ChoiceT m) where
+  mzero             = NoAnswer
+  mplus m n         = Choice m n
+
+-- Alternatives share the continuation.
+instance (MonadPlus m) => MonadPlus (ContT i m) where
+  mzero             = lift mzero
+  mplus (C m) (C n) = C (\k -> m k `mplus` n k)
+
 
 -- $Effects
 --
@@ -307,6 +367,7 @@ instance (ReaderM m j,Monoid i)
                        => ReaderM (WriterT    i m) j where ask = lift ask
 instance (ReaderM m j) => ReaderM (StateT     i m) j where ask = lift ask
 instance (ReaderM m j) => ReaderM (ExceptionT i m) j where ask = lift ask
+instance (ReaderM m j) => ReaderM (ChoiceT      m) j where ask = lift ask
 instance (ReaderM m j) => ReaderM (ContT      i m) j where ask = lift ask
 
 
@@ -322,6 +383,7 @@ instance (WriterM m j) => WriterM (IdT          m) j where put = lift . put
 instance (WriterM m j) => WriterM (ReaderT    i m) j where put = lift . put
 instance (WriterM m j) => WriterM (StateT     i m) j where put = lift . put
 instance (WriterM m j) => WriterM (ExceptionT i m) j where put = lift . put
+instance (WriterM m j) => WriterM (ChoiceT      m) j where put = lift . put
 instance (WriterM m j) => WriterM (ContT      i m) j where put = lift . put
 
 
@@ -348,6 +410,9 @@ instance (StateM m j,Monoid i) => StateM (WriterT i m) j where
 instance (StateM m j) => StateM (ExceptionT i m) j where
   get = lift get
   set = lift . set
+instance (StateM m j) => StateM (ChoiceT m) j where
+  get = lift get
+  set = lift . set
 instance (StateM m j) => StateM (ContT i m) j where
   get = lift get
   set = lift . set
@@ -368,6 +433,8 @@ instance (ExceptionM m j) => ExceptionM (ReaderT i m) j where
 instance (ExceptionM m j,Monoid i) => ExceptionM (WriterT i m) j where
   raise = lift . raise
 instance (ExceptionM m j) => ExceptionM (StateT  i m) j where
+  raise = lift . raise
+instance (ExceptionM m j) => ExceptionM (ChoiceT   m) j where
   raise = lift . raise
 instance (ExceptionM m j) => ExceptionM (ContT   i m) j where
   raise = lift . raise
@@ -396,6 +463,10 @@ instance (ContM m,Monoid i) => ContM (WriterT i m) where
 instance (ContM m) => ContM (ExceptionT i m) where
   callCC f = X $ callCC $ \k -> runExceptionT $ f $ \a -> lift $ k $ Right a
 
+instance (ContM m) => ContM (ChoiceT m) where
+  callCC f = ChoiceEff $ callCC $ \k -> return $ f $ \a -> lift $ k $ Answer a
+    -- ??? What does this do ???
+
 instance (Monad m) => ContM (ContT i m) where
   callCC f = C $ \k -> runContT k $ f $ \a -> C $ \_ -> k a
 
@@ -413,6 +484,7 @@ instance (Monad m) => ContM (ContT i m) where
 class (ReaderM m i) => RunReaderM m i | m -> i where
   -- | Change the context for the duration of a computation.
   local        :: i -> m a -> m a
+  -- prop(?): local i (m1 >> m2) = local i m1 >> local i m2
 
 instance (Monad m)        => RunReaderM (ReaderT    i m) i where
   local i m     = lift (runReaderT i m)
@@ -432,52 +504,51 @@ class WriterM m i => RunWriterM m i | m -> i where
   -- | Collect the output from a computation.
   collect :: m a -> m (a,i)
 
+instance (Monad m,Monoid i) => RunWriterM (WriterT i m) i where
+  collect m = lift (runWriterT m)
+
 instance (RunWriterM m j) => RunWriterM (IdT m) j where
   collect (IT m) = IT (collect m)
-
 instance (RunWriterM m j) => RunWriterM (ReaderT i m) j where
   collect (R m) = R (collect . m)
-
-instance (Monad m,Monoid i) => RunWriterM (WriterT i m) i where
-  collect (W m) = lift m
-
 instance (RunWriterM m j) => RunWriterM (StateT i m) j where
   collect (S m) = S (liftM swap . collect . m)
     where swap (~(a,s),w) = ((a,w),s)
-
 instance (RunWriterM m j) => RunWriterM (ExceptionT i m) j where
   collect (X m) = X (liftM swap (collect m))
     where swap (Right a,w)  = Right (a,w)
           swap (Left x,_)   = Left x
-    -- NOTE: If the local computation fails, then the output
-    -- is discarded because the result type cannot accommodate it.
-
+  -- NOTE: if an exception is risen while we are collecting,
+  -- then we ignore the output.  If the output is important,
+  -- then use 'try' to ensure that no exception may occur.
+  -- Example: do (r,w) <- collect (try m)
+  --             case r of
+  --               Left err -> ... do something ...
+  --               Right a  -> ... do something ...
 
 -- | Classifies monads that support handling of exceptions.
 class ExceptionM m i => RunExceptionM m i | m -> i where
   -- | Exceptions are explicit in the result.
   try :: m a -> m (Either i a)
 
+instance (Monad m) => RunExceptionM (ExceptionT i m) i where
+  try m = lift (runExceptionT m)
+
 instance (RunExceptionM m i) => RunExceptionM (IdT m) i where
   try (IT m) = IT (try m)
-
 instance (RunExceptionM m i) => RunExceptionM (ReaderT j m) i where
   try (R m) = R (try . m)
-
 instance (RunExceptionM m i,Monoid j) => RunExceptionM (WriterT j m) i where
   try (W m) = W (liftM swap (try m))
     where swap (Right ~(a,w)) = (Right a,w)
           swap (Left e)       = (Left e, mempty)
-
 instance (RunExceptionM m i) => RunExceptionM (StateT j m) i where
   try (S m) = S (\s -> liftM (swap s) (try (m s)))
     where swap _ (Right ~(a,s)) = (Right a,s)
           swap s (Left e)       = (Left e, s)
 
-instance (Monad m) => RunExceptionM (ExceptionT i m) i where
-  try m = lift (runExceptionT m)
 
-
+--------------------------------------------------------------------------------
 -- Some convenient functions for working with continuations.
 
 -- | An explicit representation for continuations that store a value.
@@ -496,6 +567,7 @@ jump x (Lab k)      = k (x, Lab k) >> return unreachable
   where unreachable = error "(bug) jump: unreachable"
 
 
+--------------------------------------------------------------------------------
 -- | A isomorphism between (usually) monads.
 -- Typically the constructor and selector of a newtype delcaration.
 data Iso m n = Iso { close :: forall a. m a -> n a,
@@ -555,6 +627,12 @@ derive_collect iso = close iso . collect . open iso
 -- | Derive the implementation of 'try' from 'RunExceptionM'.
 derive_try :: (RunExceptionM m i) => Iso m n -> n a -> n (Either i a)
 derive_try iso = close iso . try . open iso
+
+derive_mzero :: (MonadPlus m) => Iso m n -> n a
+derive_mzero iso = close iso mzero
+
+derive_mplus :: (MonadPlus m) => Iso m n -> n a -> n a -> n a
+derive_mplus iso n1 n2 = close iso (mplus (open iso n1) (open iso n2))
 
 derive_lift :: (MonadT t, Monad m) => Iso (t m) n -> m a -> n a
 derive_lift iso m = close iso (lift m)
