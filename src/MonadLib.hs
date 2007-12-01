@@ -14,7 +14,7 @@ module MonadLib (
   -- * Effect Classes
   -- $Effects
   ReaderM(..), WriterM(..), StateM(..), ExceptionM(..), ContM(..),
-  Label, labelCC, jump,
+  getCC,
 
   -- * Execution
 
@@ -551,21 +551,12 @@ instance (RunExceptionM m i) => RunExceptionM (StateT j m) i where
 --------------------------------------------------------------------------------
 -- Some convenient functions for working with continuations.
 
--- | An explicit representation for continuations that store a value.
-newtype Label m a    = Lab ((a, Label m a) -> m ())
-
 -- | Capture the current continuation
 -- This function is like 'return', except that it also captures
--- the current continuation.  Later we can use 'jump' to go back to
--- the continuation with a possibly different value.
-labelCC            :: (ContM m) => a -> m (a, Label m a)
-labelCC x           = callCC (\k -> return (x, Lab k))
-
--- | Change the value passed to a previously captured continuation.
-jump               :: (ContM m) => a -> Label m a -> m b
-jump x (Lab k)      = k (x, Lab k) >> return unreachable
-  where unreachable = error "(bug) jump: unreachable"
-
+-- the current continuation.  The captured continuation can be used to
+-- restart the computation with a different initial value.
+getCC            :: (ContM m) => a -> m (a, a -> m b)
+getCC x0          = callCC (\k -> let f x = k (x, f) in return (x0, f))
 
 --------------------------------------------------------------------------------
 -- | A isomorphism between (usually) monads.
