@@ -71,18 +71,14 @@ newtype IdT m a           = IT (m a)
 -- | Add support for propagating a context.
 newtype ReaderT i m a     = R (i -> m a)
 
--- | Add support for collecting values (generic version).
--- Based on an idea by Josef Svenningsson from the Haskell mailing list.
-newtype GenWriterT p i m a  = W { unW :: m (p a i) }
-
 -- | Add support for collecting values.
-newtype WriterT i m a       = LW { unLW :: GenWriterT (,) i m a }
+newtype WriterT i m a     = W (m (a,i))
 
 -- | Add support for collecting values.
 -- The strict version forces the collected output at every
 -- step to avoid memory leaks.
-newtype StrictWriterT i m a = SW { unSW :: GenWriterT P2  i m a }
-iso_LW = Iso LW unLW
+newtype StrictWriterT i m a = SW { unSW :: WriterT i m a }
+
 iso_SW = Iso SW unSW
 
 -- | Add support for threading state.
@@ -99,16 +95,6 @@ data ChoiceT m a          = NoAnswer
 
 -- | Add support for jumps.
 newtype ContT i m a  = C ((a -> m i) -> m i)
-
-
-data P2 a b  = P2 a !b
-
-class P t where
-  to_pair :: t a b -> (a,b)
-  pair :: a -> b -> t a b
-
-instance P (,) where to_pair = id; pair = (,)
-instance P P2  where to_pair ~(P2 a b) = (a,b); pair = P2
 
 -- $Execution
 --
@@ -137,18 +123,15 @@ runIdT (IT a)  = a
 runReaderT    :: i -> ReaderT i m a -> m a
 runReaderT i (R m) = m i
 
-runGenWriterT    :: (Monad m, P p) => GenWriterT p i m a -> m (a,i)
-runGenWriterT (W m) = liftM to_pair m
-
 -- | Execute a writer computation.
 -- Returns the result and the collected output.
 runWriterT :: (Monad m) => WriterT i m a -> m (a,i)
-runWriterT m = runGenWriterT (unLW m)
+runWriterT (W m)  = m
 
 -- | Execute a (strict) writer computation.
 -- Returns the result and the collected output.
 runStrictWriterT :: (Monad m) => StrictWriterT i m a -> m (a,i)
-runStrictWriterT m = runGenWriterT (unSW m)
+runStrictWriterT m = runWriterT (unSW m)
 
 -- | Execute a stateful computation in the given initial state.
 -- The second component of the result is the final state.
@@ -213,9 +196,8 @@ class MonadT t where
 instance MonadT IdT            where lift m = IT m
 instance MonadT (ReaderT    i) where lift m = R (\_ -> m)
 instance MonadT (StateT     i) where lift m = S (\s -> liftM (\a -> (a,s)) m)
-instance (Monoid i, P p) => MonadT (GenWriterT p  i)
-                               where lift m = W (liftM (\a -> pair a mempty) m)
-instance (Monoid i) => MonadT (WriterT i)       where lift = derive_lift iso_LW
+instance (Monoid i) => MonadT (WriterT i)
+                              where lift m = W (liftM (\a -> (a,mempty)) m)
 instance (Monoid i) => MonadT (StrictWriterT i) where lift = derive_lift iso_SW
 instance MonadT (ExceptionT i) where lift m = X (liftM Right m)
 instance MonadT ChoiceT        where lift m = ChoiceEff (liftM Answer m)
@@ -267,8 +249,6 @@ instance BaseM Lift Lift    where inBase = id
 instance (BaseM m n) => BaseM (IdT          m) n where inBase = t_inBase
 instance (BaseM m n) => BaseM (ReaderT    i m) n where inBase = t_inBase
 instance (BaseM m n) => BaseM (StateT     i m) n where inBase = t_inBase
-instance (BaseM m n,Monoid i, P p) => BaseM (GenWriterT p i m) n
-                                                 where inBase = t_inBase
 instance (BaseM m n,Monoid i) => BaseM (WriterT i m) n
                                                  where inBase = t_inBase
 instance (BaseM m n,Monoid i) => BaseM (StrictWriterT i m) n
@@ -308,23 +288,21 @@ instance (Monad m) => Monad (StateT i m) where
   fail    = t_fail
   m >>= k = S (\s -> runStateT s m >>= \ ~(a,s') -> runStateT s' (k a))
 
-instance (Monad m,Monoid i,P p) => Monad (GenWriterT p i m) where
-  return  = t_return
-  fail    = t_fail
-  m >>= k = W $ runGenWriterT m     >>= \ ~(a,w1) ->
-                runGenWriterT (k a) >>= \ ~(b,w2) ->
-                return (pair b (mappend w1 w2))
-
 instance (Monad m,Monoid i) => Monad (WriterT i m) where
   return  = t_return
   fail    = t_fail
-  (>>=)   = derive_bind iso_LW
-
+  m >>= k = W $ runWriterT m     >>= \ ~(a,w1) ->
+                runWriterT (k a) >>= \ ~(b,w2) ->
+                return (b, mappend w1 w2)
 
 instance (Monad m,Monoid i) => Monad (StrictWriterT i m) where
   return  = t_return
   fail    = t_fail
-  (>>=)   = derive_bind iso_SW
+  m >>= k = SW $ W $ runStrictWriterT m     >>= \ ~(a,w1) ->
+                     runStrictWriterT (k a) >>= \ ~(b,w2) ->
+                     let w3 = mappend w1 w2 in
+                     w3 `seq` return (b, w3)
+
 
 instance (Monad m) => Monad (ExceptionT i m) where
   return  = t_return
@@ -353,8 +331,6 @@ instance                       Functor Lift             where fmap = liftM
 instance (Monad m)          => Functor (IdT          m) where fmap = liftM
 instance (Monad m)          => Functor (ReaderT    i m) where fmap = liftM
 instance (Monad m)          => Functor (StateT     i m) where fmap = liftM
-instance (Monad m,Monoid i,P p) => Functor (GenWriterT p  i m)
-                                                        where fmap = liftM
 instance (Monad m,Monoid i) => Functor (WriterT    i m) where fmap = liftM
 instance (Monad m,Monoid i) => Functor (StrictWriterT i m)
                                                         where fmap = liftM
@@ -386,11 +362,8 @@ instance (MonadFix m) => MonadFix (ReaderT i m) where
 instance (MonadFix m) => MonadFix (StateT i m) where
   mfix f  = S $ \s -> mfix (runStateT s . f . fst)
 
-instance (MonadFix m,Monoid i,P p) => MonadFix (GenWriterT p i m) where
-  mfix f  = W $ mfix (unW . f . fst . to_pair)
-
 instance (MonadFix m,Monoid i) => MonadFix (WriterT i m) where
-  mfix    = derive_mfix iso_LW
+  mfix f  = W $ mfix (runWriterT . f . fst)
 
 instance (MonadFix m,Monoid i) => MonadFix (StrictWriterT i m) where
   mfix    = derive_mfix iso_SW
@@ -416,13 +389,9 @@ instance (MonadPlus m) => MonadPlus (StateT i m) where
   mzero             = t_mzero
   mplus (S m) (S n) = S (\s -> mplus (m s) (n s))
 
-instance (MonadPlus m,Monoid i,P p) => MonadPlus (GenWriterT p i m) where
-  mzero             = t_mzero
-  mplus (W m) (W n) = W (mplus m n)
-
 instance (MonadPlus m,Monoid i) => MonadPlus (WriterT i m) where
   mzero             = t_mzero
-  mplus             = derive_mplus iso_LW
+  mplus (W m) (W n) = W (mplus m n)
 
 instance (MonadPlus m,Monoid i) => MonadPlus (StrictWriterT i m) where
   mzero             = t_mzero
@@ -457,8 +426,6 @@ instance (Monad m) => ReaderM (ReaderT i m) i where
   ask = R return
 
 instance (ReaderM m j) => ReaderM (IdT m) j           where ask = t_ask
-instance (ReaderM m j,Monoid i, P p) => ReaderM (GenWriterT p  i m) j
-                                                      where ask = t_ask
 instance (ReaderM m j,Monoid i) => ReaderM (WriterT i m) j
                                                       where ask = t_ask
 instance (ReaderM m j,Monoid i) => ReaderM (StrictWriterT i m) j
@@ -474,11 +441,9 @@ class (Monad m) => WriterM m i | m -> i where
   -- | Add a value to the collection.
   put  :: i -> m ()
 
-instance (Monad m,Monoid i, P p) => WriterM (GenWriterT p i m) i where
-  put x = W (return (pair () x))
-
 instance (Monad m,Monoid i) => WriterM (WriterT i m) i where
-  put   = derive_put iso_LW
+  put x = W (return ((), x))
+
 instance (Monad m,Monoid i) => WriterM (StrictWriterT i m) i where
   put   = derive_put iso_SW
 
@@ -504,8 +469,6 @@ instance (StateM m j) => StateM (IdT m) j where
   get = t_get; set = t_set
 instance (StateM m j) => StateM (ReaderT i m) j where
   get = t_get; set = t_set
-instance (StateM m j,Monoid i, P p) => StateM (GenWriterT p i m) j where
-  get = t_get; set = t_set
 instance (StateM m j,Monoid i) => StateM (WriterT i m) j where
   get = t_get; set = t_set
 instance (StateM m j,Monoid i) => StateM (StrictWriterT i m) j where
@@ -528,8 +491,6 @@ instance (Monad m) => ExceptionM (ExceptionT i m) i where
 instance (ExceptionM m j) => ExceptionM (IdT m) j where
   raise = t_raise
 instance (ExceptionM m j) => ExceptionM (ReaderT i m) j where
-  raise = t_raise
-instance (ExceptionM m j,Monoid i, P p) => ExceptionM (GenWriterT p i m) j where
   raise = t_raise
 instance (ExceptionM m j,Monoid i) => ExceptionM (WriterT i m) j where
   raise = t_raise
@@ -560,11 +521,8 @@ instance (ContM m) => ContM (ReaderT i m) where
 instance (ContM m) => ContM (StateT i m) where
   callCC f = S $ \s -> callCC $ \k -> runStateT s $ f $ \a -> lift $ k (a,s)
 
-instance (ContM m,Monoid i, P p) => ContM (GenWriterT p i m) where
-  callCC f = W $ callCC $ \k -> unW $ f $ \a -> lift $ k (pair a mempty)
-
 instance (ContM m,Monoid i) => ContM (WriterT i m) where
-  callCC = derive_callCC iso_LW
+  callCC f = W $ callCC $ \k -> runWriterT $ f $ \a -> lift $ k (a,mempty)
 
 instance (ContM m,Monoid i) => ContM (StrictWriterT i m) where
   callCC = derive_callCC iso_SW
@@ -600,10 +558,8 @@ instance (Monad m)        => RunReaderM (ReaderT    i m) i where
 
 instance (RunReaderM m j) => RunReaderM (IdT m) j where
   local i (IT m) = IT (local i m)
-instance (RunReaderM m j,Monoid i, P p) => RunReaderM (GenWriterT p i m) j where
-  local i (W m) = W (local i m)
 instance (RunReaderM m j,Monoid i) => RunReaderM (WriterT i m) j where
-  local = derive_local iso_LW
+  local i (W m) = W (local i m)
 instance (RunReaderM m j,Monoid i) => RunReaderM (StrictWriterT i m) j where
   local = derive_local iso_SW
 instance (RunReaderM m j) => RunReaderM (StateT     i m) j where
@@ -617,10 +573,8 @@ class WriterM m i => RunWriterM m i | m -> i where
   -- | Collect the output from a computation.
   collect :: m a -> m (a,i)
 
-instance (Monad m,Monoid i, P p) => RunWriterM (GenWriterT p i m) i where
-  collect m = lift (runGenWriterT m)
 instance (Monad m,Monoid i) => RunWriterM (WriterT i m) i where
-  collect = derive_collect iso_LW
+  collect m = lift (runWriterT m)
 instance (Monad m,Monoid i) => RunWriterM (StrictWriterT i m) i where
   collect = derive_collect iso_SW
 
@@ -655,13 +609,10 @@ instance (RunExceptionM m i) => RunExceptionM (IdT m) i where
   try (IT m) = IT (try m)
 instance (RunExceptionM m i) => RunExceptionM (ReaderT j m) i where
   try (R m) = R (try . m)
-instance (RunExceptionM m i,Monoid j, P p) =>
-            RunExceptionM (GenWriterT p j m) i where
-  try (W m) = W (liftM swap (try m))
-    where swap (Right r) = let (a,w) = to_pair r in pair (Right a) w
-          swap (Left e)       = pair (Left e) mempty
 instance (RunExceptionM m i,Monoid j) => RunExceptionM (WriterT j m) i where
-  try = derive_try iso_LW
+  try (W m) = W (liftM swap (try m))
+    where swap (Right ~(a,w)) = (Right a, w)
+          swap (Left e)       = (Left e, mempty)
 instance (RunExceptionM m i,Monoid j) =>
             RunExceptionM (StrictWriterT j m) i where
   try = derive_try iso_SW
