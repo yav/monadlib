@@ -77,9 +77,11 @@ newtype WriterT i m a     = W (m (a,i))
 -- | Add support for collecting values.
 -- The strict version forces the collected output at every
 -- step to avoid memory leaks.
-newtype StrictWriterT i m a = SW { unSW :: WriterT i m a }
+newtype StrictWriterT i m a = SW { unSW :: m (P a i) }
 
-iso_SW = Iso SW unSW
+data P a i = P a !i
+p_fst :: P a i -> a
+p_fst (P a _) = a
 
 -- | Add support for threading state.
 newtype StateT     i m a  = S (i -> m (a,i))
@@ -125,13 +127,14 @@ runReaderT i (R m) = m i
 
 -- | Execute a writer computation.
 -- Returns the result and the collected output.
-runWriterT :: (Monad m) => WriterT i m a -> m (a,i)
+runWriterT :: WriterT i m a -> m (a,i)
 runWriterT (W m)  = m
 
 -- | Execute a (strict) writer computation.
 -- Returns the result and the collected output.
 runStrictWriterT :: (Monad m) => StrictWriterT i m a -> m (a,i)
-runStrictWriterT m = runWriterT (unSW m)
+runStrictWriterT (SW m) = liftM to_pair m
+  where to_pair (P a w) = (a,w)
 
 -- | Execute a stateful computation in the given initial state.
 -- The second component of the result is the final state.
@@ -168,9 +171,9 @@ findOne m = fmap fst `liftM` runChoiceT m
 -- | Executie a computation that may return multiple answers,
 -- collecting all possible answers.
 findAll :: (Monad m) => ChoiceT m a -> m [a]
-findAll m = all =<< runChoiceT m
-  where all Nothing       = return []
-        all (Just (a,as)) = (a:) `liftM` findAll as
+findAll m = all_res =<< runChoiceT m
+  where all_res Nothing       = return []
+        all_res (Just (a,as)) = (a:) `liftM` findAll as
 
 -- | Execute a computation with the given continuation.
 runContT      :: (a -> m i) -> ContT i m a -> m i
@@ -197,8 +200,9 @@ instance MonadT IdT            where lift m = IT m
 instance MonadT (ReaderT    i) where lift m = R (\_ -> m)
 instance MonadT (StateT     i) where lift m = S (\s -> liftM (\a -> (a,s)) m)
 instance (Monoid i) => MonadT (WriterT i)
-                              where lift m = W (liftM (\a -> (a,mempty)) m)
-instance (Monoid i) => MonadT (StrictWriterT i) where lift = derive_lift iso_SW
+                               where lift m = W (liftM (\a -> (a,mempty)) m)
+instance (Monoid i) => MonadT (StrictWriterT i)
+                               where lift m = SW (liftM (\a -> P a mempty) m)
 instance MonadT (ExceptionT i) where lift m = X (liftM Right m)
 instance MonadT ChoiceT        where lift m = ChoiceEff (liftM Answer m)
 instance MonadT (ContT      i) where lift m = C (m >>=)
@@ -298,17 +302,15 @@ instance (Monad m,Monoid i) => Monad (WriterT i m) where
 instance (Monad m,Monoid i) => Monad (StrictWriterT i m) where
   return  = t_return
   fail    = t_fail
-  m >>= k = SW $ W $ runStrictWriterT m     >>= \ ~(a,w1) ->
-                     runStrictWriterT (k a) >>= \ ~(b,w2) ->
-                     let w3 = mappend w1 w2 in
-                     w3 `seq` return (b, w3)
-
+  m >>= k = SW $ unSW m     >>= \ ~(P a w1) ->
+                 unSW (k a) >>= \ ~(P b w2) ->
+                 return (P b (mappend w1 w2))
 
 instance (Monad m) => Monad (ExceptionT i m) where
   return  = t_return
   fail    = t_fail
-  m >>= k = X $ runExceptionT m >>= \a ->
-                case a of
+  m >>= k = X $ runExceptionT m >>= \e ->
+                case e of
                   Left x  -> return (Left x)
                   Right a -> runExceptionT (k a)
 
@@ -366,7 +368,7 @@ instance (MonadFix m,Monoid i) => MonadFix (WriterT i m) where
   mfix f  = W $ mfix (runWriterT . f . fst)
 
 instance (MonadFix m,Monoid i) => MonadFix (StrictWriterT i m) where
-  mfix    = derive_mfix iso_SW
+  mfix f  = SW $ mfix (unSW . f . p_fst)
 
 -- No instance for ChoiceT
 
@@ -394,8 +396,8 @@ instance (MonadPlus m,Monoid i) => MonadPlus (WriterT i m) where
   mplus (W m) (W n) = W (mplus m n)
 
 instance (MonadPlus m,Monoid i) => MonadPlus (StrictWriterT i m) where
-  mzero             = t_mzero
-  mplus             = derive_mplus iso_SW
+  mzero               = t_mzero
+  mplus (SW m) (SW n) = SW (mplus m n)
 
 instance (MonadPlus m) => MonadPlus (ExceptionT i m) where
   mzero             = t_mzero
@@ -445,7 +447,7 @@ instance (Monad m,Monoid i) => WriterM (WriterT i m) i where
   put x = W (return ((), x))
 
 instance (Monad m,Monoid i) => WriterM (StrictWriterT i m) i where
-  put   = derive_put iso_SW
+  put x = SW (return (P () x))
 
 instance (WriterM m j) => WriterM (IdT          m) j where put = t_put
 instance (WriterM m j) => WriterM (ReaderT    i m) j where put = t_put
@@ -525,7 +527,7 @@ instance (ContM m,Monoid i) => ContM (WriterT i m) where
   callCC f = W $ callCC $ \k -> runWriterT $ f $ \a -> lift $ k (a,mempty)
 
 instance (ContM m,Monoid i) => ContM (StrictWriterT i m) where
-  callCC = derive_callCC iso_SW
+  callCC f = SW $ callCC $ \k -> unSW $ f $ \a -> lift $ k (P a mempty)
 
 instance (ContM m) => ContM (ExceptionT i m) where
   callCC f = X $ callCC $ \k -> runExceptionT $ f $ \a -> lift $ k $ Right a
@@ -561,7 +563,7 @@ instance (RunReaderM m j) => RunReaderM (IdT m) j where
 instance (RunReaderM m j,Monoid i) => RunReaderM (WriterT i m) j where
   local i (W m) = W (local i m)
 instance (RunReaderM m j,Monoid i) => RunReaderM (StrictWriterT i m) j where
-  local = derive_local iso_SW
+  local i (SW m) = SW (local i m)
 instance (RunReaderM m j) => RunReaderM (StateT     i m) j where
   local i (S m) = S (local i . m)
 instance (RunReaderM m j) => RunReaderM (ExceptionT i m) j where
@@ -576,7 +578,7 @@ class WriterM m i => RunWriterM m i | m -> i where
 instance (Monad m,Monoid i) => RunWriterM (WriterT i m) i where
   collect m = lift (runWriterT m)
 instance (Monad m,Monoid i) => RunWriterM (StrictWriterT i m) i where
-  collect = derive_collect iso_SW
+  collect m = lift (runStrictWriterT m)
 
 instance (RunWriterM m j) => RunWriterM (IdT m) j where
   collect (IT m) = IT (collect m)
@@ -615,7 +617,9 @@ instance (RunExceptionM m i,Monoid j) => RunExceptionM (WriterT j m) i where
           swap (Left e)       = (Left e, mempty)
 instance (RunExceptionM m i,Monoid j) =>
             RunExceptionM (StrictWriterT j m) i where
-  try = derive_try iso_SW
+  try (SW m) = SW (liftM swap (try m))
+    where swap (Right (P a w))  = P (Right a) w
+          swap (Left e)         = P (Left e) mempty
 instance (RunExceptionM m i) => RunExceptionM (StateT j m) i where
   try (S m) = S (\s -> liftM (swap s) (try (m s)))
     where swap _ (Right ~(a,s)) = (Right a,s)
