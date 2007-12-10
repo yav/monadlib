@@ -68,22 +68,21 @@ data Lift a               = L a
 -- | Add nothing.  Useful as a placeholder.
 newtype IdT m a           = IT (m a)
 
--- | Add support for propagating a context.
+-- | Add support for propagating a context of type @i@.
 newtype ReaderT i m a     = R (i -> m a)
 
--- | Add support for collecting values.
--- The strict version forces the collected output at every
--- step to avoid memory leaks.  Note that this transformer
--- also supports lazy output via an output container with
--- lazy constructors.
+-- | Add support for collecting values of type @i@.
+-- The type @i@ should be a monoid, whose unit is used to represent
+-- a lack of a value, and whose binary operation is used to combine
+-- multiple values.
+-- This transformer is strict in its output component.
 newtype WriterT i m a = W { unW :: m (P a i) }
-
 data P a i = P a !i
 
--- | Add support for threading state.
+-- | Add support for threading state of type @i@.
 newtype StateT     i m a  = S (i -> m (a,i))
 
--- | Add support for exceptions.
+-- | Add support for exceptions of type @i@.
 newtype ExceptionT i m a  = X (m (Either i a))
 
 -- | Add support for multiple answers.
@@ -92,7 +91,7 @@ data ChoiceT m a          = NoAnswer
                           | Choice (ChoiceT m a) (ChoiceT m a)
                           | ChoiceEff (m (ChoiceT m a))
 
--- | Add support for jumps.
+-- | Add support for continuations within a prompt of type @i@.
 newtype ContT i m a  = C ((a -> m i) -> m i)
 
 -- $Execution
@@ -122,7 +121,7 @@ runIdT (IT a)  = a
 runReaderT    :: i -> ReaderT i m a -> m a
 runReaderT i (R m) = m i
 
--- | Execute a (strict) writer computation.
+-- | Execute a writer computation.
 -- Returns the result and the collected output.
 runWriterT :: (Monad m) => WriterT i m a -> m (a,i)
 runWriterT (W m) = liftM to_pair m
@@ -140,7 +139,7 @@ runExceptionT :: ExceptionT i m a -> m (Either i a)
 runExceptionT (X m) = m
 
 -- | Execute a computation that may return multiple answers.
--- The resulting computation computation returns 'Nothing'
+-- The resulting computation returns 'Nothing'
 -- if no answers were found, or @Just (answer,new_comp)@,
 -- where @answer@ is an answer, and @new_comp@ is a computation
 -- that may produce more answers.
@@ -598,7 +597,7 @@ jump x (Lab k)      = k (x, Lab k) >> return unreachable
 
 
 --------------------------------------------------------------------------------
--- | A isomorphism between (usually) monads.
+-- | An isomorphism between (usually) monads.
 -- Typically the constructor and selector of a newtype delcaration.
 data Iso m n = Iso { close :: forall a. m a -> n a,
                      open  :: forall a. n a -> m a }
@@ -658,14 +657,18 @@ derive_collect iso = close iso . collect . open iso
 derive_try :: (RunExceptionM m i) => Iso m n -> n a -> n (Either i a)
 derive_try iso = close iso . try . open iso
 
+-- | Derive the implementation of 'mzero' from 'MonadPlus'.
 derive_mzero :: (MonadPlus m) => Iso m n -> n a
 derive_mzero iso = close iso mzero
 
+-- | Derive the implementation of 'mplus' from 'MonadPlus'.
 derive_mplus :: (MonadPlus m) => Iso m n -> n a -> n a -> n a
 derive_mplus iso n1 n2 = close iso (mplus (open iso n1) (open iso n2))
 
+-- | Derive the implementation of 'lift' from 'MonadT'.
 derive_lift :: (MonadT t, Monad m) => Iso (t m) n -> m a -> n a
 derive_lift iso m = close iso (lift m)
 
+-- | Derive the implementation of 'inBase' from 'BaseM'.
 derive_inBase :: (BaseM m x) => Iso m n -> x a -> n a
 derive_inBase iso m = close iso (inBase m)
