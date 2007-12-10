@@ -1,0 +1,86 @@
+StrictWriter
+============
+
+Left unit: return x >>= k
+
+SW $ do ~(P a w1) <- unSW (return x)
+        ~(P b w2) <- unSW (k a)
+        return (P b (mappend w1 w2))
+=== (def: return)
+SW $ do ~(P a w1) <- return (x,mempty)
+        ~(P b w2) <- unSW (k a)
+        return (P b (mappend w1 w2))
+=== (Monad.left_unit)
+SW $ do ~(P b w2) <- unSW (k x)
+        return (P b (mappend mempty w2))
+=== (Monoid.left_unit)
+SW $ do ~(P b w2) <- unSW (k x)
+        return (P b w2)
+=== (Monad.right_unit)
+k x
+
+
+Right unit: m >>= return
+
+SW $ do ~(P a w1) <- unSW m
+        ~(P b w2) <- unSW (return a)
+        return (P b (mappend w1 w2))
+=== (def: return)
+SW $ do ~(P a w1) <- unSW m
+        ~(P b w2) <- return (P a mempty)
+        return (P b (mappend w1 w2))
+=== (Monad.left_unit)
+SW $ do ~(P a w1) <- unSW m
+        return (P a (mappend w1 mempty))
+=== (Monoid.left_unit)
+SW $ do ~(P a w1) <- unSW m
+        return (P a w1)
+=== (Monad.right_unit)
+m
+
+
+Assoc: (m >>= k1) >>= k2  === m >>= \a -> k1 a >>= k2
+
+(strategy: RHS -> LHS)
+
+SW $ do ~(P a w1) <- unSW m
+        ~(P b w2) <- unSW (k1 a >>= k2)
+        return (P b (mappend w1 w2))
+=== (def: (>>=))
+SW $ do ~(P a w1) <- unSW m
+        ~(P b w2) <- do ~(P a' w1') <- k1 a
+                        ~(P b' w2') <- k2 a'
+                        return (P b (mappend w1' w2'))
+        return (P b (mappend w1 w2))
+=== (Monad.assoc)
+SW $ do ~(P a w1)   <- unSW m
+        ~(P a' w1') <- k1 a
+        ~(P b' w2') <- k2 a'
+        ~(P b w2)   <- return (P b (mappend w1' w2'))
+        return (P b (mappend w1 w2))
+=== (Monad.right_unit)
+SW $ do ~(P a w1)   <- unSW m
+        ~(P a' w1') <- k1 a
+        ~(P b' w2') <- k2 a'
+        return (P b' (mappend w1 (mappend 21' e2') w2))
+=== (Monoid.assoc)
+SW $ do ~(P a' w1') <- unSW m
+        ~(P b' w2') <- k1 a'
+        ~(P b w2)   <- unSW (k2 b')
+        return (P b (mappend (mappend w1' w2') w2))A
+=== (Monad.right_unit)
+SW $ do ~(P a' w1') <- unSW m
+        ~(P b' w2') <- k1 a'
+        ~(P a w1) <- return (P b' (mappend w1' w2'))
+        ~(P b w2) <- unSW (k2 a)
+        return (P b (mappend w1 w2)
+=== (Monad.assoc)
+SW $ do ~(P a w1) <- do ~(P a w1) <- unSW m
+
+                        ~(P b w2) <- k1 a
+                        return (P b (mappend w1 w2))
+        ~(P b w2) <- unSW (k2 a)
+        return (P b (mappend w1 w2))
+
+
+

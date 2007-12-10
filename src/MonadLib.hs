@@ -76,7 +76,9 @@ newtype WriterT i m a     = W (m (a,i))
 
 -- | Add support for collecting values.
 -- The strict version forces the collected output at every
--- step to avoid memory leaks.
+-- step to avoid memory leaks.  Note that this transformer
+-- also supports lazy output via an output container with
+-- lazy constructors.
 newtype StrictWriterT i m a = SW { unSW :: m (P a i) }
 
 data P a i = P a !i
