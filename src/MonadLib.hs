@@ -126,7 +126,7 @@ runReaderT i (R m) = m i
 -- Returns the result and the collected output.
 runWriterT :: (Monad m) => WriterT i m a -> m (a,i)
 runWriterT (W m) = liftM to_pair m
-  where to_pair (P a w) = (a,w)
+  where to_pair ~(P a w) = (a,w)
 
 -- | Execute a stateful computation in the given initial state.
 -- The second component of the result is the final state.
