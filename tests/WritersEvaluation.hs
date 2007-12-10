@@ -2,31 +2,29 @@ import MonadLib
 import Data.Monoid
 
 data X = X
-
 instance Monoid X where
   mempty      = X
-  mappend x y = seq y (seq x X)   -- NOTE: the monoid has control over
+  mappend x y = seq y (seq x X)   -- evaluate second, then first
 
-test1 run = let x :: X
-                (a,x) = run (error "step 1" >> put (error "out 2"))
-            in print a
+data Lazy a = Lazy a
+instance Monoid a => Monoid (Lazy a) where
+  mempty                      = Lazy mempty
+  mappend ~(Lazy a) ~(Lazy b) = Lazy (mappend a b)
 
-ex1 = test1 (runId   . runWriterT)           -- prints ()
-ex2 = test1 (runLift . runWriterT)           -- exception "step 1"
-ex3 = test1 (runId   . runStrictWriterT)     -- exception "out 2"
-ex4 = test1 (runLift . runStrictWriterT)     -- exception "step 1"
+test1 run put = let (x,_) = run $ runWriterT
+                          $ do error "step 1"
+                               put (error "out 2")
+                in print x
 
-test2 run = case run $ runExceptionT $ lift (error "expensive writer") of
-              (Right _,x) -> let _ = x :: Y in "yes"
-              (Left  _,_) -> "no"
+putX :: Monad m => X -> WriterT X m ()
+putX = put
 
-data Y = Y
-instance Monoid Y where
-  mempty  = Y
-  mappend _ _ = Y
+putY :: Monad m => X -> WriterT (Lazy X) m ()
+putY = put . Lazy
 
-ex5 = test2 (runId   . runWriterT)          -- "yes"
-ex6 = test2 (runId   . runStrictWriterT)    -- exception "expensive writer"
-ex7 = test2 (runLift . runWriterT)          -- ditto
-ex8 = test2 (runLift . runStrictWriterT)    -- ditto
+ex1 = test1 runId   putX    -- exception "out 2"
+ex2 = test1 runLift putX    -- exception "step 1"
+ex3 = test1 runId   putY    -- print ()
+ex4 = test1 runLift putY    -- exception "step 1"
+
 
