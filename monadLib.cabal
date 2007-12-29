@@ -1,5 +1,5 @@
 Name:           monadLib
-Version:        3.4.2
+Version:        3.4.3
 License:        BSD3
 License-file:   LICENSE
 Author:         Iavor S. Diatchki
@@ -11,7 +11,7 @@ Description:    A collection of monad transformers.
 hs-source-dirs: src
 Build-Depends:  base
 Extra-source-files: LICENSE, README, CHANGES
-Exposed-modules: MonadLib, Monads
+Exposed-modules: MonadLib, MonadLib.Monads, MonadLib.Derive
 Extensions:
   MultiParamTypeClasses, FunctionalDependencies, Rank2Types
 GHC-options:    -O2 -W -fallow-undecidable-instances

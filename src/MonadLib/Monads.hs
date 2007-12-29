@@ -6,12 +6,13 @@
    obsolete if support for automated derivations for instances
    becomes well supported across implementations.
  -}
-module Monads (
+module MonadLib.Monads (
   Reader, Writer, State, Exception, Cont,
   runReader, runWriter, runState, runException, runCont,
   module MonadLib
 ) where
 import MonadLib
+import MonadLib.Derive
 import Control.Monad
 import Control.Monad.Fix
 import Data.Monoid
