@@ -44,7 +44,7 @@ import Prelude hiding (Ordering(..))
 
 -- | The current version of the library.
 version :: (Int,Int,Int)
-version = (3,4,3)
+version = (3,4,4)
 
 
 -- $Types
