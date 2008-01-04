@@ -36,6 +36,7 @@ module MonadLib (
 ) where
 
 
+import Control.Applicative
 import Control.Monad
 import Control.Monad.Fix
 import Data.Monoid
@@ -311,6 +312,33 @@ instance (Monad m)          => Functor (ExceptionT i m) where fmap = liftM
 instance (Monad m)          => Functor (ChoiceT      m) where fmap = liftM
 instance (Monad m)          => Functor (ContT      i m) where fmap = liftM
 
+instance                       Applicative Id               where
+  (<*>)  = ap
+  pure   = return
+instance                       Applicative Lift             where
+  (<*>)  = ap
+  pure   = return
+instance (Monad m)          => Applicative (IdT          m) where
+  (<*>)  = ap
+  pure   = return
+instance (Monad m)          => Applicative (ReaderT    i m) where
+  (<*>)  = ap
+  pure   = return
+instance (Monad m)          => Applicative (StateT     i m) where
+  (<*>)  = ap
+  pure   = return
+instance (Monad m,Monoid i) => Applicative (WriterT i m)    where
+  (<*>)  = ap
+  pure   = return
+instance (Monad m)          => Applicative (ExceptionT i m) where
+  (<*>)  = ap
+  pure   = return
+instance (Monad m)          => Applicative (ChoiceT      m) where
+  (<*>)  = ap
+  pure   = return
+instance (Monad m)          => Applicative (ContT      i m) where
+  (<*>)  = ap
+  pure   = return
 
 -- $Monadic_Value_Recursion
 --
