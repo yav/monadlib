@@ -174,21 +174,32 @@ runContT i (C m) = m i
 -- the new effect but can be combined with other operations that
 -- utilize the effect.
 
+
+-- Notes:
+--   * It is interesting to note that these use something the resembles
+--     the non-transformer 'return's.
+--   * These are more general then the lift in the MonadT class because
+--     most of them can lift arbitrary functors (some, even arbitrary type ctrs)
+lift_IdT m          = IT m
+lift_ReaderT m      = R (\_ -> m)
+lift_StateT f m     = S (\s -> f (\a -> (a,s)) m)
+lift_WriterT f m    = W (f (\a -> P a mempty) m)
+lift_ExceptionT f m = X (f Right m)
+lift_ChoiceT f m    = ChoiceEff (f Answer m)
+lift_ContT f m      = C (f m)
+
 class MonadT t where
   -- | Promote a computation from the underlying monad.
   lift :: (Monad m) => m a -> t m a
 
--- It is interesting to note that these use something the resembles
--- the non-transformer 'return's.
-
-instance MonadT IdT            where lift m = IT m
-instance MonadT (ReaderT    i) where lift m = R (\_ -> m)
-instance MonadT (StateT     i) where lift m = S (\s -> liftM (\a -> (a,s)) m)
+instance MonadT IdT            where lift = lift_IdT
+instance MonadT (ReaderT    i) where lift = lift_ReaderT
+instance MonadT (StateT     i) where lift = lift_StateT liftM
 instance (Monoid i)
-      => MonadT (WriterT i)    where lift m = W (liftM (\a -> P a mempty) m)
-instance MonadT (ExceptionT i) where lift m = X (liftM Right m)
-instance MonadT ChoiceT        where lift m = ChoiceEff (liftM Answer m)
-instance MonadT (ContT      i) where lift m = C (m >>=)
+      => MonadT (WriterT i)    where lift = lift_WriterT liftM
+instance MonadT (ExceptionT i) where lift = lift_ExceptionT liftM
+instance MonadT ChoiceT        where lift = lift_ChoiceT liftM
+instance MonadT (ContT      i) where lift = lift_ContT (>>=)
 
 
 -- Definitions for some of the methods that are the same for all transformers
@@ -312,33 +323,39 @@ instance (Monad m)          => Functor (ExceptionT i m) where fmap = liftM
 instance (Monad m)          => Functor (ChoiceT      m) where fmap = liftM
 instance (Monad m)          => Functor (ContT      i m) where fmap = liftM
 
-instance                       Applicative Id               where
-  (<*>)  = ap
-  pure   = return
-instance                       Applicative Lift             where
-  (<*>)  = ap
-  pure   = return
-instance (Monad m)          => Applicative (IdT          m) where
-  (<*>)  = ap
-  pure   = return
-instance (Monad m)          => Applicative (ReaderT    i m) where
-  (<*>)  = ap
-  pure   = return
-instance (Monad m)          => Applicative (StateT     i m) where
-  (<*>)  = ap
-  pure   = return
-instance (Monad m,Monoid i) => Applicative (WriterT i m)    where
-  (<*>)  = ap
-  pure   = return
-instance (Monad m)          => Applicative (ExceptionT i m) where
-  (<*>)  = ap
-  pure   = return
-instance (Monad m)          => Applicative (ChoiceT      m) where
-  (<*>)  = ap
-  pure   = return
-instance (Monad m)          => Applicative (ContT      i m) where
-  (<*>)  = ap
-  pure   = return
+-- Applicative support ---------------------------------------------------------
+
+-- NOTE: It may be possible to make these more general
+-- (i.e., have Applicative, or even Functor transformers)
+
+instance              Applicative Id            where (<*>) = ap; pure = return
+instance              Applicative Lift          where (<*>) = ap; pure = return
+instance (Monad m) => Applicative (IdT m)       where (<*>) = ap; pure = return
+instance (Monad m) => Applicative (ReaderT i m) where (<*>) = ap; pure = return
+instance (Monad m) => Applicative (StateT i m)  where (<*>) = ap; pure = return
+instance (Monad m,Monoid i)
+                   => Applicative (WriterT i m) where (<*>) = ap; pure = return
+instance (Monad m) => Applicative (ExceptionT i m)
+                                                where (<*>) = ap; pure = return
+instance (Monad m) => Applicative (ChoiceT m)   where (<*>) = ap; pure = return
+instance (Monad m) => Applicative (ContT i m)   where (<*>) = ap; pure = return
+
+instance (MonadPlus m)
+           => Alternative (IdT m)           where (<|>) = mplus; empty = mzero
+instance (MonadPlus m)
+           => Alternative (ReaderT i m)     where (<|>) = mplus; empty = mzero
+instance (MonadPlus m)
+           => Alternative (StateT i m)      where (<|>) = mplus; empty = mzero
+instance (MonadPlus m,Monoid i)
+           => Alternative (WriterT i m)     where (<|>) = mplus; empty = mzero
+instance (MonadPlus m)
+           => Alternative (ExceptionT i m)  where (<|>) = mplus; empty = mzero
+instance (Monad m)
+           => Alternative (ChoiceT m)       where (<|>) = mplus; empty = mzero
+instance (MonadPlus m)
+           => Alternative (ContT i m)       where (<|>) = mplus; empty = mzero
+
+
 
 -- $Monadic_Value_Recursion
 --
