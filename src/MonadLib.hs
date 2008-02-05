@@ -6,7 +6,11 @@ module MonadLib (
   -- * Types
   -- $Types
   Id, Lift, IdT, ReaderT, WriterT,
-  StateT, ExceptionT, ChoiceT, ContT,
+  StateT,
+  ExceptionT,
+  -- 
+  -- $WriterM_ExceptionT
+  ChoiceT, ContT,
 
   -- * Lifting
   -- $Lifting
@@ -59,7 +63,7 @@ newtype Id a              = I a
 -- | Computation with no effects (strict).
 data Lift a               = L a
 
--- | Add nothing.  Useful as a placeholder.
+-- | Adds no new features.  Useful as a placeholder.
 newtype IdT m a           = IT (m a)
 
 -- | Add support for propagating a context of type @i@.
@@ -362,7 +366,7 @@ instance (MonadPlus m)
 -- Recursion that does not duplicate side-effects.
 -- For details see Levent Erkok's dissertation.
 --
--- Monadic types built with 'ContT' do not support
+-- Monadic types built with 'ContT' and 'ChoiceT' do not support
 -- monadic value recursion.
 
 instance MonadFix Id where
@@ -549,7 +553,7 @@ instance (Monad m) => ContM (ContT i m) where
 -- | Classifies monads that support changing the context for a
 -- sub-computation.
 class (ReaderM m i) => RunReaderM m i | m -> i where
-  -- | Change the context for the duration of a computation.
+  -- | Change the context for the duration of a sub-computation.
   local        :: i -> m a -> m a
   -- prop(?): local i (m1 >> m2) = local i m1 >> local i m2
 
@@ -568,7 +572,7 @@ instance (RunReaderM m j) => RunReaderM (ExceptionT i m) j where
 -- | Classifies monads that support collecting the output of
 -- a sub-computation.
 class WriterM m i => RunWriterM m i | m -> i where
-  -- | Collect the output from a computation.
+  -- | Collect the output from a sub-computation.
   collect :: m a -> m (a,i)
 
 instance (Monad m,Monoid i) => RunWriterM (WriterT i m) i where
@@ -585,17 +589,26 @@ instance (RunWriterM m j) => RunWriterM (ExceptionT i m) j where
   collect (X m) = X (liftM swap (collect m))
     where swap (Right a,w)  = Right (a,w)
           swap (Left x,_)   = Left x
-  -- NOTE: if an exception is risen while we are collecting,
-  -- then we ignore the output.  If the output is important,
-  -- then use 'try' to ensure that no exception may occur.
-  -- Example: do (r,w) <- collect (try m)
-  --             case r of
-  --               Left err -> ... do something ...
-  --               Right a  -> ... do something ...
+
+-- $WriterM_ExceptionT
+--
+-- About the 'WriterM' instance:
+-- If an exception is risen while we are collecting output,
+-- then the output is lost.  If the output is important,
+-- then use 'try' to ensure that no exception may occur.
+-- Example:
+--
+-- > do (r,w) <- collect (try m)
+-- >    case r of
+-- >      Left err -> ...do something...
+-- >      Right a  -> ...do something...
 
 -- | Classifies monads that support handling of exceptions.
 class ExceptionM m i => RunExceptionM m i | m -> i where
-  -- | Exceptions are explicit in the result.
+  -- | Convert computations that may raise an exception
+  -- into computations that do not raise exception but instead,
+  -- yield a tagged results.  Exceptions are tagged with "Left",
+  -- successful computations are tagged with "Right".
   try :: m a -> m (Either i a)
 
 instance (Monad m) => RunExceptionM (ExceptionT i m) i where
@@ -621,10 +634,10 @@ instance (RunExceptionM m i) => RunExceptionM (StateT j m) i where
 -- | An explicit representation for continuations that store a value.
 newtype Label m a    = Lab ((a, Label m a) -> m ())
 
--- | Capture the current continuation
+-- | Capture the current continuation.
 -- This function is like 'return', except that it also captures
--- the current continuation.  Later we can use 'jump' to go back to
--- the continuation with a possibly different value.
+-- the current continuation.  Later, we can use 'jump' to repeat the
+-- computation from this point onwards but with a possibly different value.
 labelCC            :: (ContM m) => a -> m (a, Label m a)
 labelCC x           = callCC (\k -> return (x, Lab k))
 

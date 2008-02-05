@@ -4,7 +4,7 @@ License:        BSD3
 License-file:   LICENSE
 Author:         Iavor S. Diatchki
 Maintainer:     diatchki@galois.com
-Homepage:       http://www.galois.com/~diatchki/monadLib
+Homepage:       http://www.purely-functional.net/monadLib
 Category:       Monads
 Synopsis:       A collection of monad transformers.
 Description:    A collection of monad transformers.
