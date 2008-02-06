@@ -43,6 +43,7 @@ module MonadLib (
 import Control.Applicative
 import Control.Monad
 import Control.Monad.Fix
+import qualified Control.Exception as IO (throwIO,try,Exception)
 import Data.Monoid
 import Prelude hiding (Ordering(..))
 
@@ -494,6 +495,9 @@ class (Monad m) => ExceptionM m i | m -> i where
   -- | Raise an exception.
   raise :: i -> m a
 
+instance ExceptionM IO IO.Exception where
+  raise = IO.throwIO
+
 instance (Monad m) => ExceptionM (ExceptionT i m) i where
   raise x = X (return (Left x))
 
@@ -610,6 +614,9 @@ class ExceptionM m i => RunExceptionM m i | m -> i where
   -- yield a tagged results.  Exceptions are tagged with "Left",
   -- successful computations are tagged with "Right".
   try :: m a -> m (Either i a)
+
+instance RunExceptionM IO IO.Exception where
+  try = IO.try
 
 instance (Monad m) => RunExceptionM (ExceptionT i m) i where
   try m = lift (runExceptionT m)
