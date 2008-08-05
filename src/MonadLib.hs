@@ -8,7 +8,7 @@ module MonadLib (
   Id, Lift, IdT, ReaderT, WriterT,
   StateT,
   ExceptionT,
-  -- 
+  --
   -- $WriterM_ExceptionT
   ChoiceT, ContT,
 
@@ -43,6 +43,7 @@ module MonadLib (
 import Control.Applicative
 import Control.Monad
 import Control.Monad.Fix
+import Control.Monad.ST (ST)
 import qualified Control.Exception as IO (throwIO,try,Exception)
 import Data.Monoid
 import Prelude hiding (Ordering(..))
@@ -242,11 +243,12 @@ class (Monad m, Monad n) => BaseM m n | m -> n where
   -- | Promote a computation from the base monad.
   inBase :: n a -> m a
 
-instance BaseM IO IO        where inBase = id
-instance BaseM Maybe Maybe  where inBase = id
-instance BaseM [] []        where inBase = id
-instance BaseM Id Id        where inBase = id
-instance BaseM Lift Lift    where inBase = id
+instance BaseM IO IO         where inBase = id
+instance BaseM Maybe Maybe   where inBase = id
+instance BaseM [] []         where inBase = id
+instance BaseM Id Id         where inBase = id
+instance BaseM Lift Lift     where inBase = id
+instance BaseM (ST s) (ST s) where inBase = id
 
 
 instance (BaseM m n) => BaseM (IdT          m) n where inBase = t_inBase
