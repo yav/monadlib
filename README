@@ -10,8 +10,9 @@ README              This file.
 Setup.hs            Used by the Cabal framework.
 monadLib.cabal      Used by the Cabal framework.
 
-src/MonadLib.hs     The library.
-src/Monads.hs       Definitions for some more base monads (optional).
+src/MonadLib.hs        The library.
+src/MonadLib/Derive.hs Definitions useful for monads defined with newtype.
+src/MonadLib/Monads.hs Definitions for some more base monads (optional).
 
 
 Simple Installation
