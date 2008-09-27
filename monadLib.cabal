@@ -13,7 +13,10 @@ Build-Depends:  base
 Build-type:     Simple
 Extra-source-files: LICENSE, README, CHANGES
 Exposed-modules: MonadLib, MonadLib.Monads, MonadLib.Derive
+
+
 Extensions:
-  MultiParamTypeClasses, FunctionalDependencies, Rank2Types
-GHC-options:    -O2 -W -fallow-undecidable-instances
+  MultiParamTypeClasses, FunctionalDependencies, Rank2Types,
+  UndecidableInstances
+GHC-options:    -O2 -W
 
