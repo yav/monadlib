@@ -1,5 +1,5 @@
 Name:           monadLib
-Version:        3.4.5
+Version:        3.4.6
 License:        BSD3
 License-file:   LICENSE
 Author:         Iavor S. Diatchki
@@ -9,7 +9,7 @@ Category:       Monads
 Synopsis:       A collection of monad transformers.
 Description:    A collection of monad transformers.
 hs-source-dirs: src
-Build-Depends:  base
+Build-Depends:  base < 4
 Build-type:     Simple
 Extra-source-files: LICENSE, README, CHANGES
 Exposed-modules: MonadLib, MonadLib.Monads, MonadLib.Derive
