@@ -45,6 +45,7 @@ import Control.Monad
 import Control.Monad.Fix
 import Control.Monad.ST (ST)
 import qualified Control.Exception as IO (throwIO,try,Exception)
+import System.Exit(ExitCode,exitWith)
 import Data.Monoid
 import Prelude hiding (Ordering(..))
 
@@ -638,12 +639,18 @@ instance (RunExceptionM m i) => RunExceptionM (StateT j m) i where
     where swap _ (Right ~(a,s)) = (Right a,s)
           swap s (Left e)       = (Left e, s)
 
-
+-- | Classifies monads that support aborting the program and returning
+-- a given final result og type 'i'.
 class Monad m => AbortM m i where
+
+  -- | Abort the program with the given value as final result.
   abort :: i -> m a
 
 instance Monad m => AbortM (ContT i m) i where
   abort i = C (\_ -> return i)
+
+instance AbortM IO ExitCode where
+  abort = exitWith
 
 instance AbortM m i => AbortM (IdT m) i           where abort = t_abort
 instance AbortM m i => AbortM (ReaderT j m) i     where abort = t_abort
