@@ -18,7 +18,7 @@ module MonadLib (
 
   -- * Effect Classes
   -- $Effects
-  ReaderM(..), WriterM(..), StateM(..), ExceptionM(..), ContM(..),
+  ReaderM(..), WriterM(..), StateM(..), ExceptionM(..), ContM(..), AbortM(..),
   Label, labelCC, jump,
 
   -- * Execution
@@ -236,6 +236,9 @@ t_set i     = lift (set i)
 
 t_raise    :: (MonadT t, ExceptionM m i) => i -> t m a
 t_raise i   = lift (raise i)
+
+t_abort    :: (MonadT t, AbortM m i) => i -> t m a
+t_abort i   = lift (abort i)
 --------------------------------------------------------------------------------
 
 
@@ -547,7 +550,6 @@ instance (ContM m) => ContM (ChoiceT m) where
 instance (Monad m) => ContM (ContT i m) where
   callCC f = C $ \k -> runContT k $ f $ \a -> C $ \_ -> k a
 
-
 -- $Nested_Exec
 --
 -- The following classes define operations that are overloaded
@@ -636,6 +638,20 @@ instance (RunExceptionM m i) => RunExceptionM (StateT j m) i where
     where swap _ (Right ~(a,s)) = (Right a,s)
           swap s (Left e)       = (Left e, s)
 
+
+class Monad m => AbortM m i where
+  abort :: i -> m a
+
+instance Monad m => AbortM (ContT i m) i where
+  abort i = C (\_ -> return i)
+
+instance AbortM m i => AbortM (IdT m) i           where abort = t_abort
+instance AbortM m i => AbortM (ReaderT j m) i     where abort = t_abort
+instance (AbortM m i,Monoid j)
+                    => AbortM (WriterT j m) i     where abort = t_abort
+instance AbortM m i => AbortM (StateT j m) i      where abort = t_abort
+instance AbortM m i => AbortM (ExceptionT j m) i  where abort = t_abort
+instance AbortM m i => AbortM (ChoiceT m) i       where abort = t_abort
 
 --------------------------------------------------------------------------------
 -- Some convenient functions for working with continuations.
