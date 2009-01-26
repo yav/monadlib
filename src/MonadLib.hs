@@ -101,7 +101,7 @@ newtype ContT i m a  = C ((a -> m i) -> m i)
 -- of a computation by translating a computation into an
 -- equivalent computation in the underlying monad.
 -- (The exceptions are 'Id' and 'Lift' which are not transformers
--- but ordinary monas and so, their run operations simply
+-- but ordinary monads and so, their run operations simply
 -- eliminate the monad.)
 
 
@@ -160,7 +160,7 @@ runChoiceT (ChoiceEff m)  = runChoiceT =<< m
 findOne :: (Monad m) => ChoiceT m a -> m (Maybe a)
 findOne m = fmap fst `liftM` runChoiceT m
 
--- | Executie a computation that may return multiple answers,
+-- | Execute a computation that may return multiple answers,
 -- collecting all possible answers.
 findAll :: (Monad m) => ChoiceT m a -> m [a]
 findAll m = all_res =<< runChoiceT m
@@ -555,7 +555,7 @@ instance (Monad m) => ContM (ContT i m) where
 --
 -- The following classes define operations that are overloaded
 -- versions of the @run@ operations.   Unlike the @run@ operations,
--- these functions do not change the type of the computation (i.e, they
+-- these functions do not change the type of the computation (i.e., they
 -- do not remove a layer).  Instead, they perform the effects in
 -- a ``separate effect thread''.
 
@@ -640,7 +640,7 @@ instance (RunExceptionM m i) => RunExceptionM (StateT j m) i where
           swap s (Left e)       = (Left e, s)
 
 -- | Classifies monads that support aborting the program and returning
--- a given final result og type 'i'.
+-- a given final result of type 'i'.
 class Monad m => AbortM m i where
 
   -- | Abort the program with the given value as final result.
