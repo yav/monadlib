@@ -577,6 +577,8 @@ instance (RunReaderM m j) => RunReaderM (StateT     i m) j where
   local i (S m) = S (local i . m)
 instance (RunReaderM m j) => RunReaderM (ExceptionT i m) j where
   local i (X m) = X (local i m)
+instance (RunReaderM m j) => RunReaderM (ContT i m) j where
+  local i (C m) = C (local i . m)
 
 -- | Classifies monads that support collecting the output of
 -- a sub-computation.
@@ -660,6 +662,8 @@ instance (RunContM m i n j) => RunContM (StateT s m) i (StateT s n) j where
                lift $ reset $ do
                   (a,_) <- runStateT s m -- discard resulting state
                   return a
+instance (RunContM m i n j, Monoid e) => RunContM (WriterT e m) i (WriterT e n) j where
+  reset m = lift (reset $ liftM fst $ runWriterT m)
 
 suspend :: (ContM m, AbortM m i) => ((a -> m b) -> m i) -> m a
 suspend f = callCC $ \ k -> f k >>= abort
