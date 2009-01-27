@@ -19,7 +19,7 @@ module MonadLib (
   -- * Effect Classes
   -- $Effects
   ReaderM(..), WriterM(..), StateM(..), ExceptionM(..), ContM(..), AbortM(..),
-  Label, labelCC, jump,
+  Label, labelCC, jump, shift,
 
   -- * Execution
 
@@ -32,7 +32,7 @@ module MonadLib (
 
   -- ** Nested Execution
   -- $Nested_Exec
-  RunReaderM(..), RunWriterM(..), RunExceptionM(..),
+  RunReaderM(..), RunWriterM(..), RunExceptionM(..), RunContM(..),
 
   -- * Miscellaneous
   version,
@@ -638,6 +638,34 @@ instance (RunExceptionM m i) => RunExceptionM (StateT j m) i where
   try (S m) = S (\s -> liftM (swap s) (try (m s)))
     where swap _ (Right ~(a,s)) = (Right a,s)
           swap s (Left e)       = (Left e, s)
+
+
+
+class (ContM m, ContM n, AbortM m i, AbortM n j, Monad m, Monad n)
+     => RunContM m i n j | n i -> m, m j -> n, m -> i, n -> j where
+  reset :: m i -> n i
+
+
+
+instance (Monad m) => RunContM (ContT i m) i (ContT j m) j where
+  reset m = lift (runContT return m)
+
+
+instance RunContM m i n j => RunContM (ReaderT e m) i (ReaderT e n) j where
+  reset (R m) = R (reset . m)
+instance (RunContM m i n j) => RunContM (IdT m) i (IdT n) j where
+  reset (IT m) = IT (reset m)
+instance (RunContM m i n j) => RunContM (StateT s m) i (StateT s n) j where
+  reset m = do s <- get
+               lift $ reset $ do
+                  (a,_) <- runStateT s m -- discard resulting state
+                  return a
+
+suspend :: (ContM m, AbortM m i) => ((a -> m b) -> m i) -> m a
+suspend f = callCC $ \ k -> f k >>= abort
+
+shift :: RunContM m i n j => ((a -> n i) -> m i) -> m a
+shift f = suspend $ \ k -> f $ \ a -> reset $ k a
 
 -- | Classifies monads that support aborting the program and returning
 -- a given final result of type 'i'.
