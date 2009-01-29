@@ -628,7 +628,7 @@ instance (RunWriterM m i n j)
 -- | Classifies monads that support handling of exceptions.
 class (ExceptionM m i, ExceptionM n j)
   => RunExceptionM m i n j
-  | m -> i, n -> i, m j -> n, n i -> m where
+  | m -> i, n -> j, m j -> n, n i -> m where
   -- | Convert computations that may raise an exception
   -- into computations that do not raise exception but instead,
   -- yield a tagged results.  Exceptions are tagged with "Left",
