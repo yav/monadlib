@@ -6,7 +6,7 @@ module MonadLib.Derive (
   Iso(Iso), derive_fmap, derive_return, derive_bind, derive_fail, derive_mfix,
   derive_ask, derive_put, derive_get, derive_set, derive_raise, derive_callCC,
   derive_abort,
-  derive_local, derive_collect, derive_try,
+  -- derive_local, derive_collect, derive_try,
   derive_mzero, derive_mplus,
   derive_lift, derive_inBase,
 ) where
@@ -68,17 +68,19 @@ derive_callCC iso f = close iso (callCC (open iso . f . (close iso .)))
 derive_abort :: (AbortM m i) => Iso m n -> i -> n a
 derive_abort iso i = close iso (abort i)
 
+{-
 -- | Derive the implementation of 'local' from 'RunReaderM'.
-derive_local :: (RunReaderM m i) => Iso m n -> i -> n a -> n a
-derive_local iso i = close iso . local i . open iso
+derive_local :: (RunReaderM m i n j) => Iso m m' -> i -> m' a -> n a
+derive_local iso1 i = local i . open iso1
 
 -- | Derive the implementation of 'collect' from 'RunWriterM'.
-derive_collect :: (RunWriterM m i) => Iso m n -> n a -> n (a,i)
-derive_collect iso = close iso . collect . open iso
+derive_collect :: (RunWriterM m i n j) => Iso m m' -> m' a -> n (a,i)
+derive_collect iso = collect . open iso
 
 -- | Derive the implementation of 'try' from 'RunExceptionM'.
-derive_try :: (RunExceptionM m i) => Iso m n -> n a -> n (Either i a)
-derive_try iso = close iso . try . open iso
+derive_try :: (RunExceptionM m i n j) => Iso m m' -> m' a -> n (Either i a)
+derive_try iso = try . open iso
+-}
 
 -- | Derive the implementation of 'mzero' from 'MonadPlus'.
 derive_mzero :: (MonadPlus m) => Iso m n -> n a

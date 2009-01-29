@@ -89,14 +89,18 @@ runState  i  = runId . runStateT i           . unS
 runException = runId . runExceptionT         . unX
 runCont   i  = runId . runContT (return . i) . unC
 
-instance RunReaderM (Reader i) i where
-  local = derive_local iso_R
+instance RunReaderM (Reader i) i (Reader j) j where
+  local x (R' m)  = R' (local x m)
 
-instance (Monoid i) => RunWriterM (Writer i) i where
-  collect = derive_collect iso_W
+instance (Monoid i, Monoid j) => RunWriterM (Writer i) i (Writer j) j where
+  collect (W' m)  = W' (collect m)
 
-instance RunExceptionM (Exception i) i where
-  try = derive_try iso_X
+instance RunExceptionM (Exception i) i (Exception j) j where
+  try (X' m)      = X' (try m)
 
+instance AbortM (Cont i) i where
+  abort i         = C' (abort i)
 
+instance RunContM (Cont i) i (Cont j) j where
+  reset (C' m)    = C' (reset m)
 
