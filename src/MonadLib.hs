@@ -578,8 +578,6 @@ instance (RunReaderM m i n j)
 instance (RunReaderM m i n j)
   => RunReaderM (ExceptionT x m) i (ExceptionT x n) j where
   local i (X m) = X (local i m)
-instance (RunReaderM m j) => RunReaderM (ContT i m) j where
-  local i (C m) = C (local i . m)
 
 
 -- | Classifies monads that support collecting the output of
