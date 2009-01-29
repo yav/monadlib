@@ -182,31 +182,23 @@ runContT i (C m) = m i
 -- utilize the effect.
 
 
+class MonadT t where
+  -- | Promote a computation from the underlying monad.
+  lift :: (Monad m) => m a -> t m a
+
 -- Notes:
 --   * It is interesting to note that these use something the resembles
 --     the non-transformer 'return's.
 --   * These are more general then the lift in the MonadT class because
 --     most of them can lift arbitrary functors (some, even arbitrary type ctrs)
-lift_IdT m          = IT m
-lift_ReaderT m      = R (\_ -> m)
-lift_StateT f m     = S (\s -> f (\a -> (a,s)) m)
-lift_WriterT f m    = W (f (\a -> P a mempty) m)
-lift_ExceptionT f m = X (f Right m)
-lift_ChoiceT f m    = ChoiceEff (f Answer m)
-lift_ContT f m      = C (f m)
-
-class MonadT t where
-  -- | Promote a computation from the underlying monad.
-  lift :: (Monad m) => m a -> t m a
-
-instance MonadT IdT            where lift = lift_IdT
-instance MonadT (ReaderT    i) where lift = lift_ReaderT
-instance MonadT (StateT     i) where lift = lift_StateT liftM
+instance MonadT IdT            where lift m = IT m
+instance MonadT (ReaderT    i) where lift m = R (\_ -> m)
+instance MonadT (StateT     i) where lift m = S (\s -> liftM (\a -> (a,s)) m)
 instance (Monoid i)
-      => MonadT (WriterT i)    where lift = lift_WriterT liftM
-instance MonadT (ExceptionT i) where lift = lift_ExceptionT liftM
-instance MonadT ChoiceT        where lift = lift_ChoiceT liftM
-instance MonadT (ContT      i) where lift = lift_ContT (>>=)
+      => MonadT (WriterT i)    where lift m = W (liftM (\a -> P a mempty) m)
+instance MonadT (ExceptionT i) where lift m = X (liftM Right m)
+instance MonadT ChoiceT        where lift m = ChoiceEff (liftM Answer m)
+instance MonadT (ContT      i) where lift m = C (\k -> m >>= k)
 
 
 -- Definitions for some of the methods that are the same for all transformers
