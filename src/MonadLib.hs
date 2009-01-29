@@ -553,40 +553,59 @@ instance (Monad m) => ContM (ContT i m) where
 
 -- | Classifies monads that support changing the context for a
 -- sub-computation.
-class (ReaderM m i) => RunReaderM m i | m -> i where
+class (ReaderM m i, ReaderM n j) => RunReaderM m i n j
+  | m -> i, n -> j, m j -> n, n i -> m where
   -- | Change the context for the duration of a sub-computation.
-  local        :: i -> m a -> m a
-  -- prop(?): local i (m1 >> m2) = local i m1 >> local i m2
+  -- Note that this function allows changing the type of
+  -- the context temporarily.
+  local        :: i -> m a -> n a
 
-instance (Monad m)        => RunReaderM (ReaderT    i m) i where
+instance (Monad m) => RunReaderM (ReaderT i m) i (ReaderT j m) j where
   local i m     = lift (runReaderT i m)
 
-instance (RunReaderM m j) => RunReaderM (IdT m) j where
+instance (RunReaderM m i n j)
+  => RunReaderM (IdT m) i (IdT n) j where
   local i (IT m) = IT (local i m)
-instance (RunReaderM m j,Monoid i) => RunReaderM (WriterT i m) j where
+
+instance (RunReaderM m i n j, Monoid w)
+  => RunReaderM (WriterT w m) i (WriterT w n) j where
   local i (W m) = W (local i m)
-instance (RunReaderM m j) => RunReaderM (StateT     i m) j where
+
+instance (RunReaderM m i n j)
+  => RunReaderM (StateT s m) i (StateT s n) j where
   local i (S m) = S (local i . m)
-instance (RunReaderM m j) => RunReaderM (ExceptionT i m) j where
+
+instance (RunReaderM m i n j)
+  => RunReaderM (ExceptionT x m) i (ExceptionT x n) j where
   local i (X m) = X (local i m)
+
 
 -- | Classifies monads that support collecting the output of
 -- a sub-computation.
-class WriterM m i => RunWriterM m i | m -> i where
+class (WriterM m i, WriterM n j) => RunWriterM m i n j
+  | m -> i, n -> j, m j -> n, n i -> m where
   -- | Collect the output from a sub-computation.
-  collect :: m a -> m (a,i)
+  collect :: m a -> n (a,i)
 
-instance (Monad m,Monoid i) => RunWriterM (WriterT i m) i where
+instance (Monad m, Monoid i, Monoid j)
+  => RunWriterM (WriterT i m) i (WriterT j m) j where
   collect m = lift (runWriterT m)
 
-instance (RunWriterM m j) => RunWriterM (IdT m) j where
+instance (RunWriterM m i n j)
+  => RunWriterM (IdT m) i (IdT n) j where
   collect (IT m) = IT (collect m)
-instance (RunWriterM m j) => RunWriterM (ReaderT i m) j where
+
+instance (RunWriterM m i n j)
+  => RunWriterM (ReaderT r m) i (ReaderT r n) j where
   collect (R m) = R (collect . m)
-instance (RunWriterM m j) => RunWriterM (StateT i m) j where
+
+instance (RunWriterM m i n j)
+  => RunWriterM (StateT s m) i (StateT s n) j where
   collect (S m) = S (liftM swap . collect . m)
     where swap (~(a,s),w) = ((a,w),s)
-instance (RunWriterM m j) => RunWriterM (ExceptionT i m) j where
+
+instance (RunWriterM m i n j)
+  => RunWriterM (ExceptionT x m) i (ExceptionT x n) j where
   collect (X m) = X (liftM swap (collect m))
     where swap (Right a,w)  = Right (a,w)
           swap (Left x,_)   = Left x
@@ -605,28 +624,38 @@ instance (RunWriterM m j) => RunWriterM (ExceptionT i m) j where
 -- >      Right a  -> ...do something...
 
 -- | Classifies monads that support handling of exceptions.
-class ExceptionM m i => RunExceptionM m i | m -> i where
+class (ExceptionM m i, ExceptionM n j)
+  => RunExceptionM m i n j
+  | m -> i, n -> i, m j -> n, n i -> m where
   -- | Convert computations that may raise an exception
   -- into computations that do not raise exception but instead,
   -- yield a tagged results.  Exceptions are tagged with "Left",
   -- successful computations are tagged with "Right".
-  try :: m a -> m (Either i a)
+  try :: m a -> n (Either i a)
 
-instance RunExceptionM IO IO.Exception where
+instance RunExceptionM IO IO.Exception IO IO.Exception where
   try = IO.try
 
-instance (Monad m) => RunExceptionM (ExceptionT i m) i where
+instance (Monad m)
+  => RunExceptionM (ExceptionT i m) i (ExceptionT j m) j where
   try m = lift (runExceptionT m)
 
-instance (RunExceptionM m i) => RunExceptionM (IdT m) i where
+instance (RunExceptionM m i n j)
+  => RunExceptionM (IdT m) i (IdT n) j where
   try (IT m) = IT (try m)
-instance (RunExceptionM m i) => RunExceptionM (ReaderT j m) i where
+
+instance (RunExceptionM m i n j)
+  => RunExceptionM (ReaderT r m) i (ReaderT r n) j where
   try (R m) = R (try . m)
-instance (RunExceptionM m i,Monoid j) => RunExceptionM (WriterT j m) i where
+
+instance (RunExceptionM m i n j, Monoid w)
+  => RunExceptionM (WriterT w m) i (WriterT w n) j where
   try (W m) = W (liftM swap (try m))
     where swap (Right (P a w))  = P (Right a) w
           swap (Left e)         = P (Left e) mempty
-instance (RunExceptionM m i) => RunExceptionM (StateT j m) i where
+
+instance (RunExceptionM m i n j)
+  => RunExceptionM (StateT s m) i (StateT s n) j where
   try (S m) = S (\s -> liftM (swap s) (try (m s)))
     where swap _ (Right ~(a,s)) = (Right a,s)
           swap s (Left e)       = (Left e, s)
