@@ -23,6 +23,12 @@ newtype State     i a = S' { unS :: StateT     i Id a }
 newtype Exception i a = X' { unX :: ExceptionT i Id a }
 newtype Cont      i a = C' { unC :: ContT      i Id a }
 
+iso_R :: Iso (ReaderT i Id) (Reader i)
+iso_W :: Iso (WriterT i Id) (Writer i)
+iso_S :: Iso (StateT i Id) (State i)
+iso_X :: Iso (ExceptionT i Id) (Exception i)
+iso_C :: Iso (ContT i Id) (Cont i)
+
 iso_R = Iso R' unR
 iso_W = Iso W' unW
 iso_S = Iso S' unS
