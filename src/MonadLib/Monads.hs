@@ -100,7 +100,7 @@ instance RunReaderM (Reader i) i (Reader j) j where
 instance (Monoid i, Monoid j) => RunWriterM (Writer i) i (Writer j) j where
   collect (W' m)  = W' (collect m)
 
-instance RunExceptionM (Exception i) i (Exception j) j where
+instance RunExceptionM (Exception i) i where
   try (X' m)      = X' (try m)
 
 instance AbortM (Cont i) i where

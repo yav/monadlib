@@ -44,9 +44,6 @@ import Control.Monad
 import Control.Monad.Fix
 import Control.Monad.ST (ST)
 import qualified Control.Exception as IO (throwIO,try,Exception)
-#ifndef USE_BASE3
-import qualified Control.Exception as IO (SomeException)
-#endif
 import System.Exit(ExitCode,exitWith)
 import Data.Monoid
 import Prelude hiding (Ordering(..))
@@ -491,7 +488,7 @@ instance (StateM m j) => StateM (ContT i m) j where
   get = t_get; set = t_set
 
 -- | Classifies monads that support raising exceptions of type @i@.
-class (Monad m) => ExceptionM m i | m -> i where
+class (Monad m) => ExceptionM m i where
   -- | Raise an exception.
   raise :: i -> m a
 
@@ -499,25 +496,16 @@ class (Monad m) => ExceptionM m i | m -> i where
 instance ExceptionM IO IO.Exception where
   raise = IO.throwIO
 #else
-instance ExceptionM IO IO.SomeException where
+instance IO.Exception t => ExceptionM IO t where
   raise = IO.throwIO
 #endif
 
 instance (Monad m) => ExceptionM (ExceptionT i m) i where
   raise x = X (return (Left x))
 
-instance (ExceptionM m j) => ExceptionM (IdT m) j where
+instance (ExceptionM m i, MonadT t, Monad (t m)) => ExceptionM (t m) i where
   raise = t_raise
-instance (ExceptionM m j) => ExceptionM (ReaderT i m) j where
-  raise = t_raise
-instance (ExceptionM m j,Monoid i) => ExceptionM (WriterT i m) j where
-  raise = t_raise
-instance (ExceptionM m j) => ExceptionM (StateT  i m) j where
-  raise = t_raise
-instance (ExceptionM m j) => ExceptionM (ChoiceT   m) j where
-  raise = t_raise
-instance (ExceptionM m j) => ExceptionM (ContT   i m) j where
-  raise = t_raise
+
 
 
 -- The following instances differ from the others because the
@@ -631,47 +619,53 @@ instance (RunWriterM m i n j)
 -- >      Right a  -> ...do something...
 
 -- | Classifies monads that support handling of exceptions.
-class (ExceptionM m i, ExceptionM n j)
-  => RunExceptionM m i n j
-  | m -> i, n -> j, m j -> n, n i -> m where
+class Monad m => RunExceptionM m i where
   -- | Convert computations that may raise an exception
   -- into computations that do not raise exception but instead,
   -- yield a tagged results.  Exceptions are tagged with "Left",
   -- successful computations are tagged with "Right".
-  try :: m a -> n (Either i a)
+  try :: m a -> m (Either i a)
 
 #ifdef USE_BASE3
 instance RunExceptionM IO IO.Exception IO IO.Exception where
   try = IO.try
 #else
-instance RunExceptionM IO IO.SomeException IO IO.SomeException where
+instance IO.Exception x => RunExceptionM IO x where
   try = IO.try
 #endif
 
-instance (Monad m)
-  => RunExceptionM (ExceptionT i m) i (ExceptionT j m) j where
+instance (Monad m) => RunExceptionM (ExceptionT i m) i where
   try m = lift (runExceptionT m)
 
-instance (RunExceptionM m i n j)
-  => RunExceptionM (IdT m) i (IdT n) j where
-  try (IT m) = IT (try m)
+instance (RunExceptionM m j, RunExceptionT t, Monad (t m))
+  => RunExceptionM (t m) j where
+  try = try'
 
-instance (RunExceptionM m i n j)
-  => RunExceptionM (ReaderT r m) i (ReaderT r n) j where
-  try (R m) = R (try . m)
 
-instance (RunExceptionM m i n j, Monoid w)
-  => RunExceptionM (WriterT w m) i (WriterT w n) j where
-  try (W m) = W (liftM swap (try m))
+class MonadT t => RunExceptionT t where
+  try' :: RunExceptionM m j => t m a -> t m (Either j a)
+
+instance RunExceptionT (ExceptionT x) where
+  try' (X m) = X $ liftM swap $ try m
+    where swap (Left j)           = Right (Left j)
+          swap (Right (Left i))   = Left i
+          swap (Right (Right a))  = Right (Right a)
+                    
+instance RunExceptionT IdT where
+  try' (IT m) = IT (try m)
+
+instance RunExceptionT (ReaderT r) where
+  try' (R m) = R (try . m)
+
+instance Monoid w => RunExceptionT (WriterT w) where
+  try' (W m) = W (liftM swap (try m))
     where swap (Right (P a w))  = P (Right a) w
           swap (Left e)         = P (Left e) mempty
 
-instance (RunExceptionM m i n j)
-  => RunExceptionM (StateT s m) i (StateT s n) j where
-  try (S m) = S (\s -> liftM (swap s) (try (m s)))
+instance RunExceptionT (StateT s) where
+  try' (S m) = S (\s -> liftM (swap s) (try (m s)))
     where swap _ (Right ~(a,s)) = (Right a,s)
           swap s (Left e)       = (Left e, s)
-
 
 
 class (ContM m, ContM n, AbortM m i, AbortM n j)
