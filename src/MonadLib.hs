@@ -43,8 +43,10 @@ import Control.Applicative
 import Control.Monad
 import Control.Monad.Fix
 import Control.Monad.ST (ST)
-import qualified Control.Exception as IO (throwIO,try,Exception)
-#ifndef USE_BASE3
+import qualified Control.Exception as IO (throwIO,try)
+#ifdef USE_BASE3
+import qualified Control.Exception as IO (Exception)
+#else
 import qualified Control.Exception as IO (SomeException)
 #endif
 import System.Exit(ExitCode,exitWith)
