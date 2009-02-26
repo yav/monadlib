@@ -33,6 +33,11 @@ module MonadLib (
   -- $Nested_Exec
   RunReaderM(..), RunWriterM(..), RunExceptionM(..),
 
+  -- * Utility functions
+  asks, puts, sets, sets_, raises,
+  mapReader, mapWriter, mapException,
+  handle,
+
   -- * Miscellaneous
   version,
   module Control.Monad
@@ -683,4 +688,64 @@ labelCC x           = callCC (\k -> return (x, Lab k))
 jump               :: (ContM m) => a -> Label m a -> m b
 jump x (Lab k)      = k (x, Lab k) >> return unreachable
   where unreachable = error "(bug) jump: unreachable"
+
+
+--------------------------------------------------------------------------------
+
+-- | Apply a function to the environment.
+-- Useful for accessing environmnt components.
+asks :: ReaderM m r => (r -> a) -> m a
+asks f      = do r <- ask
+                 return (f r)
+
+-- | Add content the output and return a result.
+puts :: WriterM m w => (a,w) -> m a
+puts ~(a,w) = put w >> return a
+
+-- | Update the state and return a result.
+sets :: StateM m s => (s -> (a,s)) -> m a
+sets f      = do s <- get
+                 let (a,s1) = f s
+                 set s1
+                 return a
+
+-- | Updates the state with the given function.
+sets_ :: StateM m s => (s -> s) -> m ()
+sets_ f     = do s <- get
+                 set (f s)
+-- | Either raise an exception or return a value.
+-- 'Left' values signify the we should raise an exception,
+-- 'Right' values indicate success.
+raises :: ExceptionM m x => Either x a -> m a
+raises (Right a)  = return a
+raises (Left x)   = raise x
+
+-- for ChoiceT we already have "msum"
+-- for ContT, not sure if it makes sense.
+
+-- | Modify the environment for the duration of a computation.
+mapReader        :: RunReaderM m r => (r -> r) -> m a -> m a
+mapReader f m     = do r <- ask
+                       local (f r) m
+
+-- | Modify the output of a computation.
+mapWriter        :: RunWriterM m w => (w -> w) -> m a -> m a
+mapWriter f m     = do ~(a,w) <- collect m
+                       put (f w)
+                       return a
+
+-- | Modify the exception that was risen by a computation.
+mapException     :: RunExceptionM m x => (x -> x) -> m a -> m a
+mapException f m  = do r <- try m
+                       case r of
+                         Right a -> return a
+                         Left x  -> raise (f x)
+
+-- | Apply the given exception handler, if a computation raises an exception.
+handle           :: RunExceptionM m x => m a -> (x -> m a) -> m a
+handle m f        = do r <- try m
+                       case r of
+                         Right a -> return a
+                         Left x  -> f x
+
 
