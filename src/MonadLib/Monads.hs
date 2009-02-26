@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -fglasgow-exts -fallow-undecidable-instances #-}
 {-|  This module contains a collection of monads that
    are defined in terms of the monad transformers from
    "MonadLib".   The definitions in this module are

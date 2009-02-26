@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -fglasgow-exts -fallow-undecidable-instances #-}
 {-| This library provides a collection of monad transformers that
     can be combined to produce various monads.
 -}
@@ -45,6 +44,9 @@ import Control.Monad
 import Control.Monad.Fix
 import Control.Monad.ST (ST)
 import qualified Control.Exception as IO (throwIO,try,Exception)
+#ifndef USE_BASE3
+import qualified Control.Exception as IO (SomeException)
+#endif
 import System.Exit(ExitCode,exitWith)
 import Data.Monoid
 import Prelude hiding (Ordering(..))
@@ -493,8 +495,13 @@ class (Monad m) => ExceptionM m i | m -> i where
   -- | Raise an exception.
   raise :: i -> m a
 
+#ifdef USE_BASE3
 instance ExceptionM IO IO.Exception where
   raise = IO.throwIO
+#else
+instance ExceptionM IO IO.SomeException where
+  raise = IO.throwIO
+#endif
 
 instance (Monad m) => ExceptionM (ExceptionT i m) i where
   raise x = X (return (Left x))
@@ -612,8 +619,13 @@ class ExceptionM m i => RunExceptionM m i | m -> i where
   -- successful computations are tagged with "Right".
   try :: m a -> m (Either i a)
 
+#ifdef USE_BASE3
 instance RunExceptionM IO IO.Exception where
   try = IO.try
+#else
+instance RunExceptionM IO IO.SomeException where
+  try = IO.try
+#endif
 
 instance (Monad m) => RunExceptionM (ExceptionT i m) i where
   try m = lift (runExceptionT m)
