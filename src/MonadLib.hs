@@ -192,6 +192,9 @@ instance RunM Id a a where
 instance RunM Lift a a where
   runM = runLift
 
+instance RunM IO a (IO a) where
+  runM = id
+
 instance RunM m a a => RunM (IdT m) a a where
   runM = runM . runIdT
 
