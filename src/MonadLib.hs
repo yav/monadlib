@@ -28,6 +28,7 @@ module MonadLib (
   runIdT, runReaderT, runWriterT,
   runStateT, runExceptionT, runContT,
   runChoiceT, findOne, findAll,
+  RunM(..),
 
   -- ** Nested Execution
   -- $Nested_Exec
@@ -180,6 +181,34 @@ findAll m = all_res =<< runChoiceT m
 runContT      :: (a -> m i) -> ContT i m a -> m i
 runContT i (C m) = m i
 
+
+-- | Generalized running.
+class Monad m => RunM m a r | m a -> r where
+  runM :: m a -> r
+
+instance RunM Id a a where
+  runM = runId
+
+instance RunM Lift a a where
+  runM = runLift
+
+instance RunM m a a => RunM (IdT m) a a where
+  runM = runM . runIdT
+
+instance RunM m a r => RunM (ReaderT i m) a (i -> r) where
+  runM m i = runM (runReaderT i m)
+
+instance (Monoid i, RunM m (a,i) r) => RunM (WriterT i m) a r where
+  runM = runM . runWriterT
+
+instance RunM m (a,i) r => RunM (StateT i m) a (i -> r) where
+  runM m i = runM (runStateT i m)
+
+instance RunM m (Either i a) r => RunM (ExceptionT i m) a r where
+  runM = runM . runExceptionT
+
+instance RunM m i r => RunM (ContT i m) a ((a -> m i) -> r) where
+  runM m k = runM (runContT k m)
 
 
 -- $Lifting

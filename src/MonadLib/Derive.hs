@@ -8,6 +8,7 @@ module MonadLib.Derive (
   derive_local, derive_collect, derive_try,
   derive_mzero, derive_mplus,
   derive_lift, derive_inBase,
+  derive_runM,
 ) where
 
 
@@ -94,3 +95,7 @@ derive_lift iso m = close iso (lift m)
 -- | Derive the implementation of 'inBase' from 'BaseM'.
 derive_inBase :: (BaseM m x) => Iso m n -> x a -> n a
 derive_inBase iso m = close iso (inBase m)
+
+-- | Derive the implementation of the 'runM' function from 'RunM'.
+derive_runM :: (RunM m a r) => Iso m n -> n a -> r
+derive_runM iso m = runM (open iso m)
