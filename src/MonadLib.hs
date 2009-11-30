@@ -195,7 +195,7 @@ instance RunM Lift a a where
 instance RunM IO a (IO a) where
   runM = id
 
-instance RunM m a a => RunM (IdT m) a a where
+instance RunM m a r => RunM (IdT m) a r where
   runM = runM . runIdT
 
 instance RunM m a r => RunM (ReaderT i m) a (i -> r) where
