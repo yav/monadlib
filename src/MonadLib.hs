@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP, MultiParamTypeClasses, FunctionalDependencies,
+             UndecidableInstances, FlexibleInstances #-}
 {-| This library provides a collection of monad transformers that
     can be combined to produce various monads.
 -}
@@ -212,6 +214,9 @@ instance RunM m (Either i a) r => RunM (ExceptionT i m) a r where
 
 instance RunM m i r => RunM (ContT i m) a ((a -> m i) -> r) where
   runM m k = runM (runContT k m)
+
+instance RunM m (Maybe (a,ChoiceT m a)) r => RunM (ChoiceT m) a r where
+  runM = runM . runChoiceT
 
 
 -- $Lifting
