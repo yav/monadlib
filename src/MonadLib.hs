@@ -621,6 +621,9 @@ instance (RunReaderM m j) => RunReaderM (StateT     i m) j where
 instance (RunReaderM m j) => RunReaderM (ExceptionT i m) j where
   local i (X m) = X (local i m)
 
+instance (RunReaderM m j) => RunReaderM (ContT i m) j where
+  local i (C m) = C (local i . m)
+
 -- | Classifies monads that support collecting the output of
 -- a sub-computation.
 class WriterM m i => RunWriterM m i | m -> i where
