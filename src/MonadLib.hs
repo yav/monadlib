@@ -644,6 +644,10 @@ instance (RunWriterM m j) => RunWriterM (ExceptionT i m) j where
   collect (X m) = X (liftM swap (collect m))
     where swap (Right a,w)  = Right (a,w)
           swap (Left x,_)   = Left x
+instance (RunWriterM m j, MonadFix m) => RunWriterM (ContT i m) j where
+  collect (C m) = C $ \k -> fst `liftM`
+                                mfix (\ ~(_,w) -> collect (m (\a -> k (a,w))))
+
 
 -- $WriterM_ExceptionT
 --
