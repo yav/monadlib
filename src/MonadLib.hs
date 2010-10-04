@@ -719,18 +719,19 @@ instance AbortM m i => AbortM (ChoiceT m) i       where abort = t_abort
 -- Some convenient functions for working with continuations.
 
 -- | An explicit representation for continuations that store a value.
-newtype Label m a    = Lab ((a, Label m a) -> m ())
+newtype Label m a    = Lab (a -> m ())
 
 -- | Capture the current continuation.
 -- This function is like 'return', except that it also captures
 -- the current continuation.  Later, we can use 'jump' to repeat the
 -- computation from this point onwards but with a possibly different value.
 labelCC            :: (ContM m) => a -> m (a, Label m a)
-labelCC x           = callCC (\k -> return (x, Lab k))
+labelCC x           = callCC (\k -> let label = Lab (\a -> k (a, label))
+                                    in return (x, label))
 
 -- | Change the value passed to a previously captured continuation.
 jump               :: (ContM m) => a -> Label m a -> m b
-jump x (Lab k)      = k (x, Lab k) >> return unreachable
+jump x (Lab k)      = k x >> return unreachable
   where unreachable = error "(bug) jump: unreachable"
 
 
