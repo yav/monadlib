@@ -27,7 +27,6 @@ module MonadLib.Derive (
 
 import MonadLib
 import Control.Applicative
-import Control.Monad
 import Control.Monad.Fix
 import Prelude hiding (Ordering(..))
 
