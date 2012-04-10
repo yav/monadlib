@@ -35,6 +35,14 @@ derive_pure iso a = close iso (pure a)
 derive_apply :: (Applicative m) => Iso m n -> n (a -> b) -> (n a -> n b)
 derive_apply iso f x = close iso (open iso f <*> open iso x)
 
+-- | Derive the implementation of 'empty' from 'Alternative'.
+derive_empty :: (Alternative m) => Iso m n -> n a
+derive_empty iso = close iso empty
+
+-- | Derive the implementation of '<|>' from 'Alternative'.
+derive_or :: (Alternative m) => Iso m n -> n a -> n a -> n a
+derive_or iso a b = close iso (open iso a <|> open iso b)
+
 -- | Derive the implementation of 'return' from 'Monad'.
 derive_return :: (Monad m) => Iso m n -> (a -> n a)
 derive_return iso a = close iso (return a)
