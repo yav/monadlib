@@ -2,12 +2,25 @@
 to get the functionality of MonadLib for user-defined newtypes.
 -}
 module MonadLib.Derive (
-  Iso(Iso), derive_fmap, derive_return, derive_bind, derive_fail, derive_mfix,
-  derive_ask, derive_put, derive_get, derive_set, derive_raise, derive_callCC,
-  derive_abort,
-  derive_local, derive_collect, derive_try,
+  Iso(Iso),
+  derive_fmap,
+  derive_pure, derive_apply,
+  derive_empty, derive_or,
+  derive_return, derive_bind, derive_fail,
   derive_mzero, derive_mplus,
-  derive_lift, derive_inBase,
+  derive_mfix,
+  derive_ask,
+  derive_local,
+  derive_put,
+  derive_collect,
+  derive_get,
+  derive_set,
+  derive_raise,
+  derive_try,
+  derive_callCC,
+  derive_abort,
+  derive_lift,
+  derive_inBase,
   derive_runM,
 ) where
 
