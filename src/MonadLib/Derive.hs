@@ -13,6 +13,7 @@ module MonadLib.Derive (
 
 
 import MonadLib
+import Control.Applicative
 import Control.Monad
 import Control.Monad.Fix
 import Prelude hiding (Ordering(..))
@@ -25,6 +26,14 @@ data Iso m n = Iso { close :: forall a. m a -> n a,
 -- | Derive the implementation of 'fmap' from 'Functor'.
 derive_fmap :: (Functor m) => Iso m n -> (a -> b) -> n a -> n b
 derive_fmap iso f m = close iso (fmap f (open iso m))
+
+-- | Derive the implementation of 'pure' from 'Applicative'.
+derive_pure :: (Applicative m) => Iso m n -> a -> n a
+derive_pure iso a = close iso (pure a)
+
+-- | Derive the implementation of '<*>' from 'Applicative'.
+derive_apply :: (Applicative m) => Iso m n -> n (a -> b) -> (n a -> n b)
+derive_apply iso f x = close iso (open iso f <*> open iso x)
 
 -- | Derive the implementation of 'return' from 'Monad'.
 derive_return :: (Monad m) => Iso m n -> (a -> n a)
