@@ -1,19 +1,34 @@
+{-# LANGUAGE Rank2Types #-}
+
 {-| This module defines a number of functions that make it easy
 to get the functionality of MonadLib for user-defined newtypes.
 -}
 module MonadLib.Derive (
-  Iso(Iso), derive_fmap, derive_return, derive_bind, derive_fail, derive_mfix,
-  derive_ask, derive_put, derive_get, derive_set, derive_raise, derive_callCC,
-  derive_abort,
-  derive_local, derive_collect, derive_try,
+  Iso(Iso),
+  derive_fmap,
+  derive_pure, derive_apply,
+  derive_empty, derive_or,
+  derive_return, derive_bind, derive_fail,
   derive_mzero, derive_mplus,
-  derive_lift, derive_inBase,
+  derive_mfix,
+  derive_ask,
+  derive_local,
+  derive_put,
+  derive_collect,
+  derive_get,
+  derive_set,
+  derive_raise,
+  derive_try,
+  derive_callCC,
+  derive_abort,
+  derive_lift,
+  derive_inBase,
   derive_runM,
 ) where
 
 
 import MonadLib
-import Control.Monad
+import Control.Applicative
 import Control.Monad.Fix
 import Prelude hiding (Ordering(..))
 
@@ -25,6 +40,22 @@ data Iso m n = Iso { close :: forall a. m a -> n a,
 -- | Derive the implementation of 'fmap' from 'Functor'.
 derive_fmap :: (Functor m) => Iso m n -> (a -> b) -> n a -> n b
 derive_fmap iso f m = close iso (fmap f (open iso m))
+
+-- | Derive the implementation of 'pure' from 'Applicative'.
+derive_pure :: (Applicative m) => Iso m n -> a -> n a
+derive_pure iso a = close iso (pure a)
+
+-- | Derive the implementation of '<*>' from 'Applicative'.
+derive_apply :: (Applicative m) => Iso m n -> n (a -> b) -> (n a -> n b)
+derive_apply iso f x = close iso (open iso f <*> open iso x)
+
+-- | Derive the implementation of 'empty' from 'Alternative'.
+derive_empty :: (Alternative m) => Iso m n -> n a
+derive_empty iso = close iso empty
+
+-- | Derive the implementation of '<|>' from 'Alternative'.
+derive_or :: (Alternative m) => Iso m n -> n a -> n a -> n a
+derive_or iso a b = close iso (open iso a <|> open iso b)
 
 -- | Derive the implementation of 'return' from 'Monad'.
 derive_return :: (Monad m) => Iso m n -> (a -> n a)
