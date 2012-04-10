@@ -1,3 +1,5 @@
+{-# LANGUAGE Rank2Types #-}
+
 {-| This module defines a number of functions that make it easy
 to get the functionality of MonadLib for user-defined newtypes.
 -}
