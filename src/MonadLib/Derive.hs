@@ -19,7 +19,7 @@ module MonadLib.Derive (
   derive_set,
   derive_raise,
   derive_try,
-  derive_callCC,
+  derive_callWithCC,
   derive_abort,
   derive_lift,
   derive_inBase,
@@ -92,9 +92,10 @@ derive_set iso x = close iso (set x)
 derive_raise :: (ExceptionM m i) => Iso m n -> i -> n a
 derive_raise iso x = close iso (raise x)
 
--- | Derive the implementation of 'callCC' from 'ContM'.
-derive_callCC :: (ContM m) => Iso m n -> ((a -> n b) -> n a) -> n a
-derive_callCC iso f = close iso (callCC (open iso . f . (close iso .)))
+-- | Derive the implementation of 'callWithCC' from 'ContM'.
+derive_callWithCC :: (ContM m) => Iso m n -> (Label n a -> n a) -> n a
+derive_callWithCC iso f = close iso (callWithCC $ open iso . f . relab)
+  where relab k = labelC (\a -> close iso $ jump a k)
 
 derive_abort :: (AbortM m i) => Iso m n -> i -> n a
 derive_abort iso i = close iso (abort i)

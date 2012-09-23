@@ -12,7 +12,6 @@ module MonadLib.Monads (
 ) where
 import MonadLib
 import MonadLib.Derive
-import Control.Monad
 import Control.Monad.Fix
 import Data.Monoid
 
@@ -80,7 +79,7 @@ instance ReaderM (Reader i) i where ask = derive_ask iso_R
 instance (Monoid i) => WriterM (Writer i) i where put = derive_put iso_W
 instance StateM (State i) i where get = derive_get iso_S; set = derive_set iso_S
 instance ExceptionM (Exception i) i where raise = derive_raise iso_X
-instance ContM (Cont i) where callCC = derive_callCC iso_C
+instance ContM (Cont i) where callWithCC = derive_callWithCC iso_C
 
 runReader     :: i -> Reader i a -> a
 runWriter     :: Writer i a -> (a,i)

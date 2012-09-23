@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP, MultiParamTypeClasses, FunctionalDependencies,
              UndecidableInstances, FlexibleInstances #-}
+{-# LANGUAGE Rank2Types #-}
 {-| This library provides a collection of monad transformers that
     can be combined to produce various monads.
 -}
@@ -20,7 +21,7 @@ module MonadLib (
   -- * Effect Classes
   -- $Effects
   ReaderM(..), WriterM(..), StateM(..), ExceptionM(..), ContM(..), AbortM(..),
-  Label, labelCC, jump,
+  Label, labelCC, jump, labelC, callCC,
 
   -- * Execution
 
@@ -570,29 +571,36 @@ instance (ExceptionM m j) => ExceptionM (ContT   i m) j where
 -- | Classifies monads that provide access to a computation's continuation.
 class Monad m => ContM m where
   -- | Capture the current continuation.
-  callCC :: ((a -> m b) -> m a) -> m a
+  callWithCC :: (Label m a -> m a) -> m a
+
+
+-- This captures a common pattern in the lifted definitions of `callWithCC`.
+liftJump :: (ContM m, MonadT t) =>
+  (a -> b) -> (Label (t m) a -> t m a) -> (Label m b -> t m a)
+liftJump ans f l = f $ Lab (\a -> lift $ jump (ans a) l)
 
 instance (ContM m) => ContM (IdT m) where
-  callCC f = IT $ callCC $ \k -> runIdT $ f $ \a -> lift $ k a
+  callWithCC f = IT $ callWithCC $ \k -> runIdT $ liftJump id f k
 
 instance (ContM m) => ContM (ReaderT i m) where
-  callCC f = R $ \r -> callCC $ \k -> runReaderT r $ f $ \a -> lift $ k a
+  callWithCC f = R $ \r -> callWithCC $ \k -> runReaderT r $ liftJump id f k
 
 instance (ContM m) => ContM (StateT i m) where
-  callCC f = S $ \s -> callCC $ \k -> runStateT s $ f $ \a -> lift $ k (a,s)
+  callWithCC f = S $ \s -> callWithCC $ \k -> runStateT s $ liftJump (ans s) f k
+    where ans s a = (a,s)
 
 instance (ContM m,Monoid i) => ContM (WriterT i m) where
-  callCC f = W $ callCC $ \k -> unW $ f $ \a -> lift $ k (P a mempty)
+  callWithCC f = W $ callWithCC $ \k -> unW $ liftJump (`P` mempty) f k
 
 instance (ContM m) => ContM (ExceptionT i m) where
-  callCC f = X $ callCC $ \k -> runExceptionT $ f $ \a -> lift $ k $ Right a
+  callWithCC f = X $ callWithCC $ \k -> runExceptionT $ liftJump Right f k
 
 instance (ContM m) => ContM (ChoiceT m) where
-  callCC f = ChoiceEff $ callCC $ \k -> return $ f $ \a -> lift $ k $ Answer a
+  callWithCC f = ChoiceEff $ callWithCC $ \k -> return $ liftJump Answer f k
     -- ??? What does this do ???
 
 instance (Monad m) => ContM (ContT i m) where
-  callCC f = C $ \k -> runContT k $ f $ \a -> C $ \_ -> k a
+  callWithCC f = C $ \k -> runContT k $ f $ Lab (\a -> C $ \_ -> k a)
 
 -- $Nested_Exec
 --
@@ -719,20 +727,29 @@ instance AbortM m i => AbortM (ChoiceT m) i       where abort = t_abort
 -- Some convenient functions for working with continuations.
 
 -- | An explicit representation for continuations that store a value.
-newtype Label m a    = Lab (a -> m ())
+newtype Label m a    = Lab (forall b. a -> m b)
 
 -- | Capture the current continuation.
 -- This function is like 'return', except that it also captures
 -- the current continuation.  Later, we can use 'jump' to repeat the
 -- computation from this point onwards but with a possibly different value.
-labelCC            :: (ContM m) => a -> m (a, Label m a)
-labelCC x           = callCC (\k -> let label = Lab (\a -> k (a, label))
-                                    in return (x, label))
+labelCC   :: (ContM m) => a -> m (a, Label m a)
+labelCC x  = callWithCC (\l -> let label = Lab (\a -> jump (a, label) l)
+                               in return (x, label))
+
+-- | A version of `callWithCC` that avoids the need for an explicit
+-- use of the `jump` function.
+callCC :: ContM m => ((a -> m b) -> m a) -> m a
+callCC f = callWithCC $ \l -> f $ \a -> jump a l
+
+
+-- | Label a given continuation.
+labelC             :: (forall b. a -> m b) -> Label m a
+labelC k            = Lab k
 
 -- | Change the value passed to a previously captured continuation.
-jump               :: (ContM m) => a -> Label m a -> m b
-jump x (Lab k)      = k x >> return unreachable
-  where unreachable = error "(bug) jump: unreachable"
+jump               :: a -> Label m a -> m b
+jump x (Lab k)      = k x
 
 
 --------------------------------------------------------------------------------
