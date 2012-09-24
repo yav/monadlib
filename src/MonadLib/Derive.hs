@@ -93,9 +93,9 @@ derive_raise :: (ExceptionM m i) => Iso m n -> i -> n a
 derive_raise iso x = close iso (raise x)
 
 -- | Derive the implementation of 'callWithCC' from 'ContM'.
-derive_callWithCC :: (ContM m) => Iso m n -> (Label n a -> n a) -> n a
-derive_callWithCC iso f = close iso (callWithCC $ open iso . f . relab)
-  where relab k = labelC (\a -> close iso $ jump a k)
+derive_callWithCC :: (ContM m) => Iso m n -> ((a -> Label n) -> n a) -> n a
+derive_callWithCC iso f = close iso $ callWithCC $ open iso . f . relab
+  where relab k a = labelC (close iso $ jump $ k a)
 
 derive_abort :: (AbortM m i) => Iso m n -> i -> n a
 derive_abort iso i = close iso (abort i)

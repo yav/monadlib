@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP, MultiParamTypeClasses, FunctionalDependencies,
              UndecidableInstances, FlexibleInstances #-}
 {-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-| This library provides a collection of monad transformers that
     can be combined to produce various monads.
 -}
@@ -21,7 +22,7 @@ module MonadLib (
   -- * Effect Classes
   -- $Effects
   ReaderM(..), WriterM(..), StateM(..), ExceptionM(..), ContM(..), AbortM(..),
-  Label, labelCC, jump, labelC, callCC,
+  Label, labelCC, labelCC_, jump, labelC, callCC,
 
   -- * Execution
 
@@ -571,13 +572,16 @@ instance (ExceptionM m j) => ExceptionM (ContT   i m) j where
 -- | Classifies monads that provide access to a computation's continuation.
 class Monad m => ContM m where
   -- | Capture the current continuation.
-  callWithCC :: (Label m a -> m a) -> m a
+  callWithCC :: ((a -> Label m) -> m a) -> m a
 
 
 -- This captures a common pattern in the lifted definitions of `callWithCC`.
 liftJump :: (ContM m, MonadT t) =>
-  (a -> b) -> (Label (t m) a -> t m a) -> (Label m b -> t m a)
-liftJump ans f l = f $ Lab (\a -> lift $ jump (ans a) l)
+  (a -> b) ->
+  ((a -> Label (t m)) -> t m a) ->
+  ((b -> Label    m ) -> t m a)
+liftJump ans f l = f $ \a -> Lab (lift $ jump $ l $ ans a)
+
 
 instance (ContM m) => ContM (IdT m) where
   callWithCC f = IT $ callWithCC $ \k -> runIdT $ liftJump id f k
@@ -600,7 +604,7 @@ instance (ContM m) => ContM (ChoiceT m) where
     -- ??? What does this do ???
 
 instance (Monad m) => ContM (ContT i m) where
-  callWithCC f = C $ \k -> runContT k $ f $ Lab (\a -> C $ \_ -> k a)
+  callWithCC f = C $ \k -> runContT k $ f $ \a -> Lab (C $ \_ -> k a)
 
 -- $Nested_Exec
 --
@@ -726,30 +730,38 @@ instance AbortM m i => AbortM (ChoiceT m) i       where abort = t_abort
 --------------------------------------------------------------------------------
 -- Some convenient functions for working with continuations.
 
--- | An explicit representation for continuations that store a value.
-newtype Label m a    = Lab (forall b. a -> m b)
+-- | An explicit representation for monadic continuarions.
+newtype Label m     = Lab (forall b. m b)
 
 -- | Capture the current continuation.
 -- This function is like 'return', except that it also captures
 -- the current continuation.  Later, we can use 'jump' to repeat the
 -- computation from this point onwards but with a possibly different value.
-labelCC   :: (ContM m) => a -> m (a, Label m a)
-labelCC x  = callWithCC (\l -> let label = Lab (\a -> jump (a, label) l)
-                               in return (x, label))
+labelCC            :: (ContM m) => a -> m (a, a -> Label m)
+labelCC x           = callWithCC (\l -> let label a = Lab (jump (l (a, label)))
+                                        in return (x, label))
+
+-- | Capture the current continuation.
+-- Later we can use `jump` to restart the program from this point.
+labelCC_           :: forall m. (ContM m) => m (Label m)
+labelCC_            = callWithCC $ \k -> let x :: m a   -- Signature matters!!!
+                                             x = jump (k (Lab x))
+                                         in x
 
 -- | A version of `callWithCC` that avoids the need for an explicit
 -- use of the `jump` function.
-callCC :: ContM m => ((a -> m b) -> m a) -> m a
-callCC f = callWithCC $ \l -> f $ \a -> jump a l
-
+callCC             :: ContM m => ((a -> m b) -> m a) -> m a
+callCC f            = callWithCC $ \l -> f $ \a -> jump $ l a
 
 -- | Label a given continuation.
-labelC             :: (forall b. a -> m b) -> Label m a
+labelC             :: (forall b. m b) -> Label m
 labelC k            = Lab k
 
--- | Change the value passed to a previously captured continuation.
-jump               :: a -> Label m a -> m b
-jump x (Lab k)      = k x
+-- | Restart a previously captured computation.
+jump               :: Label m -> m a
+jump (Lab k)       = k
+
+
 
 
 --------------------------------------------------------------------------------
