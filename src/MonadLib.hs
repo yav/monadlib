@@ -730,7 +730,7 @@ instance AbortM m i => AbortM (ChoiceT m) i       where abort = t_abort
 --------------------------------------------------------------------------------
 -- Some convenient functions for working with continuations.
 
--- | An explicit representation for monadic continuarions.
+-- | An explicit representation for monadic continuations.
 newtype Label m     = Lab (forall b. m b)
 
 -- | Capture the current continuation.
