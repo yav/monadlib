@@ -2,6 +2,7 @@
              UndecidableInstances, FlexibleInstances #-}
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE Trustworthy #-}
 {-| This library provides a collection of monad transformers that
     can be combined to produce various monads.
 -}
