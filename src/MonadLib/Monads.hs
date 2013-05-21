@@ -1,3 +1,6 @@
+{-# LANGUAGE Safe #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-|  This module contains a collection of monads that
    are defined in terms of the monad transformers from
    "MonadLib".   The definitions in this module are

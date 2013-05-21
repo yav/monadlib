@@ -1,7 +1,8 @@
 {-# LANGUAGE MultiParamTypeClasses,
              FlexibleInstances,
              FunctionalDependencies,
-             OverlappingInstances #-}
+             OverlappingInstances,
+             Safe #-}
 {-# OPTIONS_GHC -fallow-undecidable-instances #-}
 {-| This library provides a collection of monad transformers that
     can be combined to produce various monads.
