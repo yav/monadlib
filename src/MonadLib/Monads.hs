@@ -15,6 +15,7 @@ module MonadLib.Monads (
 ) where
 import MonadLib
 import MonadLib.Derive
+import Control.Applicative
 import Control.Monad.Fix
 import Data.Monoid
 
@@ -72,6 +73,12 @@ instance (Monoid i) => Functor (Writer    i) where fmap = derive_fmap iso_W
 instance               Functor (State     i) where fmap = derive_fmap iso_S
 instance               Functor (Exception i) where fmap = derive_fmap iso_X
 instance               Functor (Cont      i) where fmap = derive_fmap iso_C
+
+instance               Applicative (Reader    i) where pure = return; (<*>) = ap
+instance (Monoid i) => Applicative (Writer    i) where pure = return; (<*>) = ap
+instance               Applicative (State     i) where pure = return; (<*>) = ap
+instance               Applicative (Exception i) where pure = return; (<*>) = ap
+instance               Applicative (Cont      i) where pure = return; (<*>) = ap
 
 instance               MonadFix (Reader    i) where mfix = derive_mfix iso_R
 instance (Monoid i) => MonadFix (Writer    i) where mfix = derive_mfix iso_W
