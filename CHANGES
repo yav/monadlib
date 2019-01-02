@@ -1,3 +1,6 @@
+Version 3.8
+  * Added `WithBase`
+
 Version 3.3.0
 
 * Remove 'RunStateM'

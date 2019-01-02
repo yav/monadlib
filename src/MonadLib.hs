@@ -1,8 +1,9 @@
 {-# LANGUAGE CPP, MultiParamTypeClasses, FunctionalDependencies,
              UndecidableInstances, FlexibleInstances #-}
+{-# LANGUAGE DataKinds, TypeFamilies, TypeOperators #-}
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE Safe #-}
 {-| This library provides a collection of monad transformers that
     can be combined to produce various monads.
 -}
@@ -43,6 +44,7 @@ module MonadLib (
   asks, puts, sets, sets_, raises,
   mapReader, mapWriter, mapException,
   handle,
+  WithBase,
 
   -- * Miscellaneous
   version,
@@ -62,6 +64,7 @@ import qualified Control.Exception as IO (SomeException)
 #endif
 import System.Exit(ExitCode,exitWith)
 import Data.Monoid
+import Data.Kind(Type)
 import Prelude hiding (Ordering(..))
 
 -- | The current version of the library.
@@ -822,5 +825,32 @@ handle m f        = do r <- try m
                        case r of
                          Right a -> return a
                          Left x  -> f x
+
+
+{- | A convenience type family for defining stacks of monads.
+The first entry in the list is the top-most layer of the monad stack
+(i.e., the one that is furtherest from the base).  For example:
+
+> newtype M a = M { unM ::
+>   WithBase IO
+>     '[ ReaderT    Int
+>      , StateT     Char
+>      , ExceptionT String
+>      ] a
+>   }
+
+is equivalent to:
+
+> newtype M a = M { unM ::
+>   ReaderT    Int      (
+>   StateT     Char     (
+>   ExceptionT String
+>   IO                  )) a
+>   }
+
+-}
+type family WithBase base layers :: Type -> Type where
+  WithBase b '[]        = b
+  WithBase b (f ': fs)  = f (WithBase b fs)
 
 

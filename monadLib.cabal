@@ -1,5 +1,5 @@
 Name:           monadLib
-Version:        3.7.3
+Version:        3.8
 License:        BSD3
 License-file:   LICENSE
 Author:         Iavor S. Diatchki
@@ -25,13 +25,6 @@ Library
     MonadLib,
     MonadLib.Monads,
     MonadLib.Derive
-  Extensions:
-    CPP,
-    MultiParamTypeClasses,
-    FunctionalDependencies,
-    Rank2Types,
-    FlexibleInstances,
-    UndecidableInstances
 
   if flag(base3)
     Build-depends: base < 4
