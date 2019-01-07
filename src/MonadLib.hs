@@ -46,8 +46,6 @@ module MonadLib (
   handle,
   WithBase,
 
-  -- * Miscellaneous
-  version,
   module Control.Monad
 ) where
 
@@ -66,10 +64,6 @@ import System.Exit(ExitCode,exitWith)
 import Data.Monoid
 import Data.Kind(Type)
 import Prelude hiding (Ordering(..))
-
--- | The current version of the library.
-version :: (Int,Int,Int)
-version = (3,5,2)
 
 
 -- $Types
