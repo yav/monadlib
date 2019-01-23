@@ -1,5 +1,5 @@
 Name:           monadLib
-Version:        3.8
+Version:        3.9
 License:        BSD3
 License-file:   LICENSE
 Author:         Iavor S. Diatchki
@@ -15,10 +15,6 @@ Extra-source-files:
   README,
   CHANGES
 
-Flag base3
-  Description: Build for compatability with base3
-  Default:     False
-
 Library
   hs-source-dirs: src
   Exposed-modules:
@@ -26,11 +22,7 @@ Library
     MonadLib.Monads,
     MonadLib.Derive
 
-  if flag(base3)
-    Build-depends: base < 4
-    CPP-options: -DUSE_BASE3
-  else
-    Build-depends: base >= 4 && < 5
+  Build-depends: base >= 4 && < 5
 
   GHC-options:    -O2 -Wall
 

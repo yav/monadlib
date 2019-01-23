@@ -1,3 +1,7 @@
+Version 3.0
+  * Add instane from `MonadFail`---none of the transformers implement this
+    functionality so the implementation just lifts things.
+
 Version 3.8
   * Added `WithBase`
 

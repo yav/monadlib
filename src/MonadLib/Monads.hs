@@ -1,4 +1,5 @@
 {-# LANGUAGE Safe #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-|  This module contains a collection of monads that
@@ -15,9 +16,11 @@ module MonadLib.Monads (
 ) where
 import MonadLib
 import MonadLib.Derive
-import Control.Applicative
 import Control.Monad.Fix
+#if __GLASGOW_HASKELL__ < 800
 import Data.Monoid
+import Control.Applicative
+#endif
 
 newtype Reader    i a = R' { unR :: ReaderT    i Id a }
 newtype Writer    i a = W' { unW :: WriterT    i Id a }

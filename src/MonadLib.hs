@@ -49,6 +49,9 @@ module MonadLib (
   module Control.Monad
 ) where
 
+#if __GLASGOW_HASKELL__ < 800
+import Data.Monoid
+#endif
 
 import Control.Applicative
 import Control.Monad
@@ -61,9 +64,12 @@ import qualified Control.Exception as IO (Exception)
 import qualified Control.Exception as IO (SomeException)
 #endif
 import System.Exit(ExitCode,exitWith)
-import Data.Monoid
 import Data.Kind(Type)
 import Prelude hiding (Ordering(..))
+#if __GLASGOW_HASKELL__ >= 800
+import qualified Control.Monad.Fail as MF
+import Control.Monad.Fail(MonadFail)
+#endif
 
 
 -- $Types
@@ -257,6 +263,9 @@ t_return x  = lift (return x)
 
 t_fail     :: (MonadT t, Monad m) => String -> t m a
 t_fail x    = lift (fail x)
+
+t_fail'    :: (MonadT t, MonadFail m) => String -> t m a
+t_fail' x   = lift (MF.fail x)
 
 t_mzero    :: (MonadT t, MonadPlus m) => t m a
 t_mzero     = lift mzero
@@ -848,3 +857,13 @@ type family WithBase base layers :: Type -> Type where
   WithBase b (f ': fs)  = f (WithBase b fs)
 
 
+#if __GLASGOW_HASKELL__ >= 800
+instance MonadFail m => MonadFail (IdT          m) where fail = t_fail'
+instance MonadFail m => MonadFail (ReaderT    i m) where fail = t_fail'
+instance (Monoid i, MonadFail m)
+                     => MonadFail (WriterT    i m) where fail = t_fail'
+instance MonadFail m => MonadFail (StateT     i m) where fail = t_fail'
+instance MonadFail m => MonadFail (ExceptionT i m) where fail = t_fail'
+instance MonadFail m => MonadFail (ChoiceT      m) where fail = t_fail'
+instance MonadFail m => MonadFail (ContT      i m) where fail = t_fail'
+#endif
