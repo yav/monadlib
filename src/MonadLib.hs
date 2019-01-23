@@ -58,11 +58,7 @@ import Control.Monad
 import Control.Monad.Fix
 import Control.Monad.ST (ST)
 import qualified Control.Exception as IO (throwIO,try)
-#ifdef USE_BASE3
-import qualified Control.Exception as IO (Exception)
-#else
 import qualified Control.Exception as IO (SomeException)
-#endif
 import System.Exit(ExitCode,exitWith)
 import Data.Kind(Type)
 import Prelude hiding (Ordering(..))
@@ -102,7 +98,8 @@ data P a i = P a !i
 newtype StateT     i m a  = S (i -> m (a,i))
 
 -- | Add support for exceptions of type @i@.
-newtype ExceptionT i m a  = X (m (Either i a))
+newtype ExceptionT i m a  = X { unX :: forall r. (i -> m r) ->
+                                                 (a -> m r) -> m r }
 
 -- | Add support for multiple answers.
 data ChoiceT m a          = NoAnswer
@@ -154,8 +151,8 @@ runStateT i (S m) = m i
 -- | Execute a computation with exceptions.
 -- Successful results are tagged with 'Right',
 -- exceptional results are tagged with 'Left'.
-runExceptionT :: ExceptionT i m a -> m (Either i a)
-runExceptionT (X m) = m
+runExceptionT :: Monad m => ExceptionT i m a -> m (Either i a)
+runExceptionT (X m) = m (pure . Left) (pure . Right)
 
 -- | Execute a computation that may return multiple answers.
 -- The resulting computation returns 'Nothing'
@@ -248,7 +245,7 @@ instance MonadT (ReaderT    i) where lift m = R (\_ -> m)
 instance MonadT (StateT     i) where lift m = S (\s -> liftM (\a -> (a,s)) m)
 instance (Monoid i)
       => MonadT (WriterT i)    where lift m = W (liftM (\a -> P a mempty) m)
-instance MonadT (ExceptionT i) where lift m = X (liftM Right m)
+instance MonadT (ExceptionT i) where lift m = X (\_ k -> m >>= k)
 instance MonadT ChoiceT        where lift m = ChoiceEff (liftM Answer m)
 instance MonadT (ContT      i) where lift m = C (\k -> m >>= k)
 
@@ -352,10 +349,7 @@ instance (Monad m,Monoid i) => Monad (WriterT i m) where
 instance (Monad m) => Monad (ExceptionT i m) where
   return  = t_return
   fail    = t_fail
-  m >>= k = X $ runExceptionT m >>= \e ->
-                case e of
-                  Left x  -> return (Left x)
-                  Right a -> runExceptionT (k a)
+  m >>= k = X $ \r ok -> unX m r $ \a -> unX (k a) r ok
 
 instance (Monad m) => Monad (ChoiceT m) where
   return x  = Answer x
@@ -445,7 +439,12 @@ instance (MonadFix m,Monoid i) => MonadFix (WriterT i m) where
 -- No instance for ChoiceT
 
 instance (MonadFix m) => MonadFix (ExceptionT i m) where
-  mfix f  = X $ mfix (runExceptionT . f . fromRight)
+  mfix f  = X $ \r ok -> do res <- mfix (runExceptionT . f . fromRight)
+                            case res of
+                              Left x  -> r x
+                              Right a -> ok a
+
+  -- mfix f  = X $ mfix (runExceptionT . f . fromRight)
     where fromRight (Right a) = a
           fromRight _         = error "ExceptionT: mfix looped."
 
@@ -464,12 +463,12 @@ instance (MonadPlus m) => MonadPlus (StateT i m) where
   mplus (S m) (S n) = S (\s -> mplus (m s) (n s))
 
 instance (MonadPlus m,Monoid i) => MonadPlus (WriterT i m) where
-  mzero               = t_mzero
+  mzero             = t_mzero
   mplus (W m) (W n) = W (mplus m n)
 
 instance (MonadPlus m) => MonadPlus (ExceptionT i m) where
   mzero             = t_mzero
-  mplus (X m) (X n) = X (mplus m n)
+  mplus m n         = X $ \r ok -> mplus (unX m r ok) (unX m r ok)
 
 instance (Monad m) => MonadPlus (ChoiceT m) where
   mzero             = NoAnswer
@@ -548,16 +547,11 @@ class (Monad m) => ExceptionM m i | m -> i where
   -- | Raise an exception.
   raise :: i -> m a
 
-#ifdef USE_BASE3
-instance ExceptionM IO IO.Exception where
-  raise = IO.throwIO
-#else
 instance ExceptionM IO IO.SomeException where
   raise = IO.throwIO
-#endif
 
 instance (Monad m) => ExceptionM (ExceptionT i m) i where
-  raise x = X (return (Left x))
+  raise x = X $ \r _ -> r x
 
 instance (ExceptionM m j) => ExceptionM (IdT m) j where
   raise = t_raise
@@ -604,7 +598,11 @@ instance (ContM m,Monoid i) => ContM (WriterT i m) where
   callWithCC f = W $ callWithCC $ \k -> unW $ liftJump (`P` mempty) f k
 
 instance (ContM m) => ContM (ExceptionT i m) where
-  callWithCC f = X $ callWithCC $ \k -> runExceptionT $ liftJump Right f k
+  callWithCC f = X $ \r ok ->
+     do res <- callWithCC $ \k -> runExceptionT $ liftJump Right f k
+        case res of
+          Left x -> r x
+          Right a -> ok a
 
 instance (ContM m) => ContM (ChoiceT m) where
   callWithCC f = ChoiceEff $ callWithCC $ \k -> return $ liftJump Answer f k
@@ -638,7 +636,10 @@ instance (RunReaderM m j,Monoid i) => RunReaderM (WriterT i m) j where
 instance (RunReaderM m j) => RunReaderM (StateT     i m) j where
   local i (S m) = S (local i . m)
 instance (RunReaderM m j) => RunReaderM (ExceptionT i m) j where
-  local i (X m) = X (local i m)
+  local i m = X $ \r ok -> do res <- local i (runExceptionT m)
+                              case res of
+                                Left x -> r x
+                                Right a -> ok a
 
 instance (RunReaderM m j) => RunReaderM (ContT i m) j where
   local i (C m) = C (local i . m)
@@ -660,9 +661,11 @@ instance (RunWriterM m j) => RunWriterM (StateT i m) j where
   collect (S m) = S (liftM swap . collect . m)
     where swap (~(a,s),w) = ((a,w),s)
 instance (RunWriterM m j) => RunWriterM (ExceptionT i m) j where
-  collect (X m) = X (liftM swap (collect m))
-    where swap (Right a,w)  = Right (a,w)
-          swap (Left x,_)   = Left x
+  collect m = X $ \r ok -> do (res,w) <- collect (runExceptionT m)
+                              case res of
+                                Right a -> ok (a,w)
+                                Left x  -> r x
+
 instance (RunWriterM m j, MonadFix m) => RunWriterM (ContT i m) j where
   collect (C m) = C $ \k -> fst `liftM`
                                 mfix (\ ~(_,w) -> collect (m (\a -> k (a,w))))
@@ -689,13 +692,8 @@ class ExceptionM m i => RunExceptionM m i | m -> i where
   -- successful computations are tagged with "Right".
   try :: m a -> m (Either i a)
 
-#ifdef USE_BASE3
-instance RunExceptionM IO IO.Exception where
-  try = IO.try
-#else
 instance RunExceptionM IO IO.SomeException where
   try = IO.try
-#endif
 
 instance (Monad m) => RunExceptionM (ExceptionT i m) i where
   try m = lift (runExceptionT m)
