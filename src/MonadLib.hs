@@ -465,13 +465,6 @@ instance (MonadFix m,Monoid i) => MonadFix (WriterT i m) where
   mfix f  = W $ mfix (unW . f . val)
     where val ~(P a _) = a
 
--- No instance for ChoiceT.  Well, here is one.  What does it do?
-instance (MonadFix m) => MonadFix (ChoiceT m) where
-  mfix f  = chPack $ mfix (runChoiceT . f . fromOne)
-    where fromOne (Just (a,_)) = a -- XXX: do we need to check that there
-                                   -- are no other options?
-          fromOne _            = error "ExceptionT: mfix looped."
-
 instance (MonadFix m) => MonadFix (ExceptionT i m) where
   mfix f  = exPack $ mfix (runExceptionT . f . fromRight)
     where fromRight (Right a) = a
@@ -868,7 +861,7 @@ The first entry in the list is the top-most layer of the monad stack
 (i.e., the one that is furtherest from the base).  For example:
 
 > newtype M a = M { unM ::
->   WithBase IO
+>   /ithBase IO
 >     '[ ReaderT    Int
 >      , StateT     Char
 >      , ExceptionT String
