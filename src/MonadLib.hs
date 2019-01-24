@@ -774,7 +774,7 @@ instance (RunExceptionM m i) => RunExceptionM (StateT j m) i where
           swap s (Left e)       = (Left e, s)
 
 instance RunExceptionM m i => RunExceptionM (ChoiceT m) i where
-  try n = N $ \k -> do mb <- try (runChoiceT n)
+  try m = N $ \k -> do mb <- try (runChoiceT m)
                        case mb of
                          Left x -> k (Left x)
                          Right opts ->
