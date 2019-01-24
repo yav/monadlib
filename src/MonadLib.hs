@@ -313,7 +313,7 @@ t_abort    :: (MonadT t, AbortM m i) => i -> t m a
 t_abort i   = lift (abort i)
 
 -- bind for monads based on continuations
-c_bind     :: (forall a. m a -> WithCont r a) ->
+c_bind     :: (forall x. m x -> WithCont r x) ->
               m a -> (a -> m b) ->
               WithCont r b
 c_bind un m f = \k -> un m $ \a -> un (f a) k
