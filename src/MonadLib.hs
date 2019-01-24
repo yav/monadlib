@@ -701,7 +701,28 @@ instance (RunWriterM m j) => RunWriterM (ExceptionT i m) j where
                              Right a -> k (a,w)
                              Left x  -> exRaise x
 
+{- | When collecting, each "thread" sees the input that has been produced
+from the start of the collection up to when the result was produced,
+in a left-most depth-first ordering based on `mplus`.
+Example:
 
+> do put [1]
+>    collect (put [2] `mplus` put [3])
+
+The whole comutations has only 1 as an output (2 and 3 are collected),
+and then it has two possible results: the left one, where only 2 is observed,
+and he right one where both 2 and 3 are observed (1 is not seen as it is
+outside the collection).
+-}
+instance (Monoid j, RunWriterM m j) => RunWriterM (ChoiceT m) j where
+  collect m = N $ \k -> do (res,w) <- collect (runChoiceT m)
+                           case res of
+                             Nothing    -> chZero
+                             Just (a,n) -> chPlus (k (a,w)) (unN (also w n) k)
+    where also w n = do (a,w1) <- collect n
+                        pure (a, w `mappend` w1)
+
+-- ??
 instance (RunWriterM m j, MonadFix m) => RunWriterM (ContT i m) j where
   collect (C m) = C $ \k -> fst `liftM`
                                 mfix (\ ~(_,w) -> collect (m (\a -> k (a,w))))
