@@ -768,6 +768,17 @@ instance (RunExceptionM m i) => RunExceptionM (StateT j m) i where
     where swap _ (Right ~(a,s)) = (Right a,s)
           swap s (Left e)       = (Left e, s)
 
+instance RunExceptionM m i => RunExceptionM (ChoiceT m) i where
+  try n = N $ \k -> do mb <- try (runChoiceT n)
+                       case mb of
+                         Left x -> k (Left x)
+                         Right opts ->
+                           case opts of
+                             Nothing -> chZero
+                             Just (a,n) ->
+                               let k' = k . Right
+                               in chPlus (k' a) (unN n k')
+
 -- | Classifies monads that support aborting the program and returning
 -- a given final result of type 'i'.
 class Monad m => AbortM m i where
