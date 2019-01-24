@@ -102,10 +102,14 @@ newtype ExceptionT i m a  = X { unX :: forall r. (i -> m r) ->
                                                  (a -> m r) -> m r }
 
 -- | Add support for multiple answers.
-data ChoiceT m a          = NoAnswer
-                          | Answer a
-                          | Choice (ChoiceT m a) (ChoiceT m a)
-                          | ChoiceEff (m (ChoiceT m a))
+data ChoiceT m a          = N { unN :: forall r. m r ->
+                                                 (m r -> m r -> m r) ->
+                                                 (a -> m r) ->
+                                                 m r }
+
+
+
+
 
 -- | Add support for continuations within a prompt of type @i@.
 newtype ContT i m a  = C ((a -> m i) -> m i)
@@ -161,14 +165,26 @@ runExceptionT (X m) = m (pure . Left) (pure . Right)
 -- that may produce more answers.
 -- The search is depth-first and left-biased with respect to the
 -- 'mplus' operation.
-runChoiceT :: (Monad m) => ChoiceT m a -> m (Maybe (a,ChoiceT m a))
-runChoiceT (Answer a)     = return (Just (a,NoAnswer))
-runChoiceT NoAnswer       = return Nothing
-runChoiceT (Choice l r)   = do x <- runChoiceT l
-                               case x of
-                                 Nothing      -> runChoiceT r
-                                 Just (a,l1)  -> return (Just (a,Choice l1 r))
-runChoiceT (ChoiceEff m)  = runChoiceT =<< m
+runChoiceT :: (Monad m) => ChoiceT m a -> m (Maybe (a, ChoiceT m a))
+runChoiceT m = unN m none choice one
+  where
+  none       = pure Nothing
+  choice x y = do mb <- x
+                  case mb of
+                    Nothing -> y
+                    Just (a,more) -> pure (Just (a, more `mplus` packChoiceT y))
+
+  one a  = pure (Just (a, mzero))
+
+
+packChoiceT :: Monad m => m (Maybe (a, ChoiceT m a)) -> ChoiceT m a
+packChoiceT x = N $ \z jn c -> do mb <- x
+                                  case mb of
+                                    Nothing -> z
+                                    Just (a,r) -> jn (c a) (unN r z jn c)
+
+
+
 
 -- | Execute a computation that may return multiple answers,
 -- returning at most one answer.
@@ -245,9 +261,9 @@ instance MonadT (ReaderT    i) where lift m = R (\_ -> m)
 instance MonadT (StateT     i) where lift m = S (\s -> liftM (\a -> (a,s)) m)
 instance (Monoid i)
       => MonadT (WriterT i)    where lift m = W (liftM (\a -> P a mempty) m)
-instance MonadT (ExceptionT i) where lift m = X (\_ k -> m >>= k)
-instance MonadT ChoiceT        where lift m = ChoiceEff (liftM Answer m)
-instance MonadT (ContT      i) where lift m = C (\k -> m >>= k)
+instance MonadT (ExceptionT i) where lift m = X (\_ k   -> m >>= k)
+instance MonadT ChoiceT        where lift m = N (\_ _ r -> m >>= r)
+instance MonadT (ContT      i) where lift m = C (\k     -> m >>= k)
 
 
 -- Definitions for some of the methods that are the same for all transformers
@@ -351,14 +367,10 @@ instance (Monad m) => Monad (ExceptionT i m) where
   fail    = t_fail
   m >>= k = X $ \r ok -> unX m r $ \a -> unX (k a) r ok
 
-instance (Monad m) => Monad (ChoiceT m) where
-  return x  = Answer x
-  fail x    = lift (fail x)
-
-  Answer a  >>= k     = k a
-  NoAnswer >>= _      = NoAnswer
-  Choice m1 m2 >>= k  = Choice (m1 >>= k) (m2 >>= k)
-  ChoiceEff m >>= k   = ChoiceEff (liftM (>>= k) m)
+instance Monad m => Monad (ChoiceT m) where
+  return   = t_return
+  fail     = t_fail
+  m >>= f  = N (\z j r -> unN m z j (\a -> unN (f a) z j r))
 
 instance (Monad m) => Monad (ContT i m) where
   return  = t_return
@@ -468,11 +480,11 @@ instance (MonadPlus m,Monoid i) => MonadPlus (WriterT i m) where
 
 instance (MonadPlus m) => MonadPlus (ExceptionT i m) where
   mzero             = t_mzero
-  mplus m n         = X $ \r ok -> mplus (unX m r ok) (unX m r ok)
+  mplus m n         = X $ \r ok -> mplus (unX m r ok) (unX n r ok)
 
 instance (Monad m) => MonadPlus (ChoiceT m) where
-  mzero             = NoAnswer
-  mplus m n         = Choice m n
+  mzero             = N $ \z _ _ -> z
+  mplus m n         = N $ \z jn r -> jn (unN m z jn r) (unN n z jn r)
 
 -- Alternatives share the continuation.
 instance (MonadPlus m) => MonadPlus (ContT i m) where
@@ -604,9 +616,16 @@ instance (ContM m) => ContM (ExceptionT i m) where
           Left x -> r x
           Right a -> ok a
 
+
 instance (ContM m) => ContM (ChoiceT m) where
-  callWithCC f = ChoiceEff $ callWithCC $ \k -> return $ liftJump Answer f k
+  callWithCC f = N $ \z jn r -> do mb <- callWithCC $ \k ->
+                                                  runChoiceT (liftJump one f k)
+                                   case mb of
+                                     Nothing -> z
+                                     Just (a,m') -> jn (r a) (unN m' z jn r)
+    where one a = Just (a, mzero)
     -- ??? What does this do ???
+
 
 instance (Monad m) => ContM (ContT i m) where
   callWithCC f = C $ \k -> runContT k $ f $ \a -> Lab (C $ \_ -> k a)
