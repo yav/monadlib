@@ -114,7 +114,7 @@ exRaise :: Monad m => i -> ExT i m r
 exRaise = pure . Left
 
 -- | Add support for multiple answers.
-newtype ChoiceT m a = N { unN :: forall r.  WithCont (ChT m r) a }
+newtype ChoiceT m a = N { unN :: forall r. WithCont (ChT m r) a }
 
 type ChT m r = m (Maybe (r, ChoiceT m r))
 
@@ -360,7 +360,7 @@ instance Monad Lift where
 instance (Monad m) => Monad (IdT m) where
   return  = t_return
   fail    = t_fail
-  m >>= k = IT (runIdT m >>= (runIdT . k))
+  m >>= k = IT (runIdT m >>= runIdT . k)
 
 instance (Monad m) => Monad (ReaderT i m) where
   return  = t_return
@@ -470,6 +470,7 @@ instance (MonadFix m) => MonadFix (ExceptionT i m) where
     where fromRight (Right a) = a
           fromRight _         = error "ExceptionT: mfix looped."
 
+-- No instance for ChoiceT
 -- No instance for ContT
 
 instance (MonadPlus m) => MonadPlus (IdT m) where
@@ -499,7 +500,7 @@ instance (Monad m) => MonadPlus (ChoiceT m) where
 -- Alternatives share the continuation.
 instance (MonadPlus m) => MonadPlus (ContT i m) where
   mzero             = t_mzero
-  mplus (C m) (C n) = C (\k -> m k `mplus` n k)
+  mplus m n          = C (\k -> unC m k `mplus` unC n k)
 
 
 -- $Effects
@@ -655,6 +656,7 @@ instance (RunReaderM m j,Monoid i) => RunReaderM (WriterT i m) j where
   local i (W m) = W (local i m)
 instance (RunReaderM m j) => RunReaderM (StateT     i m) j where
   local i (S m) = S (local i . m)
+
 instance (RunReaderM m j) => RunReaderM (ExceptionT i m) j where
   local i m = exPack $ local i $ runExceptionT m
 
@@ -666,7 +668,7 @@ instance (RunReaderM m j) => RunReaderM (ChoiceT m) j where
 
 
 instance (RunReaderM m j) => RunReaderM (ContT i m) j where
-  local i (C m) = C (local i . m)
+  local i m = C (local i . unC m)
 
 -- | Classifies monads that support collecting the output of
 -- a sub-computation.
@@ -757,12 +759,15 @@ instance (Monad m) => RunExceptionM (ExceptionT i m) i where
 
 instance (RunExceptionM m i) => RunExceptionM (IdT m) i where
   try (IT m) = IT (try m)
+
 instance (RunExceptionM m i) => RunExceptionM (ReaderT j m) i where
   try (R m) = R (try . m)
+
 instance (RunExceptionM m i,Monoid j) => RunExceptionM (WriterT j m) i where
   try (W m) = W (liftM swap (try m))
     where swap (Right (P a w))  = P (Right a) w
           swap (Left e)         = P (Left e) mempty
+
 instance (RunExceptionM m i) => RunExceptionM (StateT j m) i where
   try (S m) = S (\s -> liftM (swap s) (try (m s)))
     where swap _ (Right ~(a,s)) = (Right a,s)
