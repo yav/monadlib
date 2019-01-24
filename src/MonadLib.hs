@@ -114,7 +114,7 @@ exRaise :: Monad m => i -> ExT i m r
 exRaise = pure . Left
 
 -- | Add support for multiple answers.
-data ChoiceT m a          = N { unN :: forall r.  WithCont (ChT m r) a }
+newtype ChoiceT m a = N { unN :: forall r.  WithCont (ChT m r) a }
 
 type ChT m r = m (Maybe (r, ChoiceT m r))
 
