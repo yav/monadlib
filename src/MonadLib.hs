@@ -75,16 +75,16 @@ import Control.Monad.Fail(MonadFail)
 -- Each type adds support for a different effect.
 
 -- | Computations with no effects.
-newtype Id a              = I a
+newtype Id a              = I { unI :: a }
 
 -- | Computation with no effects (strict).
 data Lift a               = L a
 
 -- | Adds no new features.  Useful as a placeholder.
-newtype IdT m a           = IT (m a)
+newtype IdT m a           = IT { unIT :: m a }
 
 -- | Add support for propagating a context of type @i@.
-newtype ReaderT i m a     = R (i -> m a)
+newtype ReaderT i m a     = R { unR :: i -> m a }
 
 -- | Add support for collecting values of type @i@.
 -- The type @i@ should be a monoid, whose unit is used to represent
@@ -95,7 +95,7 @@ newtype WriterT i m a = W { unW :: m (P a i) }
 data P a i = P a !i
 
 -- | Add support for threading state of type @i@.
-newtype StateT     i m a  = S (i -> m (a,i))
+newtype StateT     i m a  = S { unS :: i -> m (a,i) }
 
 type WithCont r a = (a -> r) -> r
 
@@ -151,38 +151,38 @@ newtype ContT i m a  = C { unC :: WithCont (m i) a }
 
 
 -- | Get the result of a pure computation.
-runId         :: Id a -> a
-runId (I a) = a
+runId :: Id a -> a
+runId = unI
 
 -- | Get the result of a pure strict computation.
-runLift       :: Lift a -> a
+runLift :: Lift a -> a
 runLift (L a) = a
 
 
 -- | Remove an identity layer.
-runIdT        :: IdT m a -> m a
-runIdT (IT a)  = a
+runIdT :: IdT m a -> m a
+runIdT = unIT
 
 -- | Execute a reader computation in the given context.
-runReaderT    :: i -> ReaderT i m a -> m a
-runReaderT i (R m) = m i
+runReaderT :: i -> ReaderT i m a -> m a
+runReaderT i m = unR m i
 
 -- | Execute a writer computation.
 -- Returns the result and the collected output.
 runWriterT :: (Monad m) => WriterT i m a -> m (a,i)
-runWriterT (W m) = liftM to_pair m
-  where to_pair ~(P a w) = (a,w)
+runWriterT m = liftM to_pair (unW m)
+  where to_pair ~(P a w) = (a,w)    -- XXX: should this pattern be lazy?
 
 -- | Execute a stateful computation in the given initial state.
 -- The second component of the result is the final state.
 runStateT     :: i -> StateT i m a -> m (a,i)
-runStateT i (S m) = m i
+runStateT i m = unS m i
 
 -- | Execute a computation with exceptions.
 -- Successful results are tagged with 'Right',
 -- exceptional results are tagged with 'Left'.
 runExceptionT :: Monad m => ExceptionT i m a -> m (Either i a)
-runExceptionT (X m) = m (pure . Right)
+runExceptionT m = unX m (pure . Right)
 
 -- | Execute a computation that may return multiple answers.
 -- The resulting computation returns 'Nothing'
@@ -470,28 +470,28 @@ instance (MonadFix m) => MonadFix (ExceptionT i m) where
     where fromRight (Right a) = a
           fromRight _         = error "ExceptionT: mfix looped."
 
--- No instance for ChoiceT
--- No instance for ContT
+-- No MonadFix instance for ChoiceT
+-- No MonadFix instance for ContT
 
 instance (MonadPlus m) => MonadPlus (IdT m) where
   mzero               = t_mzero
-  mplus (IT m) (IT n) = IT (mplus m n)
+  mplus m n         = IT $ mplus (runIdT m) (runIdT n)
 
 instance (MonadPlus m) => MonadPlus (ReaderT i m) where
   mzero             = t_mzero
-  mplus (R m) (R n) = R (\r -> mplus (m r) (n r))
+  mplus m n         = R (\r -> mplus (runReaderT r m) (runReaderT r n))
 
 instance (MonadPlus m) => MonadPlus (StateT i m) where
   mzero             = t_mzero
-  mplus (S m) (S n) = S (\s -> mplus (m s) (n s))
+  mplus m n         = S (\s -> mplus (runStateT s m) (runStateT s n))
 
 instance (MonadPlus m,Monoid i) => MonadPlus (WriterT i m) where
   mzero             = t_mzero
-  mplus (W m) (W n) = W (mplus m n)
+  mplus m n         = W (mplus (unW m) (unW n))
 
 instance (MonadPlus m) => MonadPlus (ExceptionT i m) where
   mzero             = t_mzero
-  mplus m n         = X $ \ok -> mplus (unX m ok) (unX n ok)
+  mplus m n         = X $ \k -> mplus (unX m k) (unX n k)
 
 instance (Monad m) => MonadPlus (ChoiceT m) where
   mzero             = N $ \_ -> chZero
@@ -500,7 +500,7 @@ instance (Monad m) => MonadPlus (ChoiceT m) where
 -- Alternatives share the continuation.
 instance (MonadPlus m) => MonadPlus (ContT i m) where
   mzero             = t_mzero
-  mplus m n          = C (\k -> unC m k `mplus` unC n k)
+  mplus m n         = C (\k -> unC m k `mplus` unC n k)
 
 
 -- $Effects
@@ -650,11 +650,14 @@ instance (Monad m)        => RunReaderM (ReaderT    i m) i where
   local i m     = lift (runReaderT i m)
 
 instance (RunReaderM m j) => RunReaderM (IdT m) j where
-  local i (IT m) = IT (local i m)
+  local i m = IT $ local i $ runIdT m
+
 instance (RunReaderM m j,Monoid i) => RunReaderM (WriterT i m) j where
-  local i (W m) = W (local i m)
+  local i m = W $ local i $ unW m 
+  -- Don't use `runWriterT` as it changes to `P` to `(,)`
+
 instance (RunReaderM m j) => RunReaderM (StateT     i m) j where
-  local i (S m) = S (local i . m)
+  local i m = S $ \s -> local i $ runStateT s m
 
 instance (RunReaderM m j) => RunReaderM (ExceptionT i m) j where
   local i m = exPack $ local i $ runExceptionT m
@@ -667,7 +670,7 @@ instance (RunReaderM m j) => RunReaderM (ChoiceT m) j where
 
 
 instance (RunReaderM m j) => RunReaderM (ContT i m) j where
-  local i m = C (local i . unC m)
+  local i m = C $ \k -> local i $ runContT k m
 
 -- | Classifies monads that support collecting the output of
 -- a sub-computation.
@@ -679,12 +682,14 @@ instance (Monad m,Monoid i) => RunWriterM (WriterT i m) i where
   collect m = lift (runWriterT m)
 
 instance (RunWriterM m j) => RunWriterM (IdT m) j where
-  collect (IT m) = IT (collect m)
+  collect m = IT $ collect $ runIdT m
+
 instance (RunWriterM m j) => RunWriterM (ReaderT i m) j where
-  collect (R m) = R (collect . m)
+  collect m = R $ \r -> collect $ runReaderT r m
+
 instance (RunWriterM m j) => RunWriterM (StateT i m) j where
-  collect (S m) = S (liftM swap . collect . m)
-    where swap (~(a,s),w) = ((a,w),s)
+  collect m = S $ \s -> do ((~(a,s1),w)) <- collect $ runStateT s m -- why lazy?
+                           pure ((a,w),s1)
 
 {- | If an exception is risen while we are collecting output,
 then the output is lost.  If the output is important,
@@ -725,8 +730,8 @@ instance (Monoid j, RunWriterM m j) => RunWriterM (ChoiceT m) j where
 
 -- ??
 instance (RunWriterM m j, MonadFix m) => RunWriterM (ContT i m) j where
-  collect (C m) = C $ \k -> fst `liftM`
-                                mfix (\ ~(_,w) -> collect (m (\a -> k (a,w))))
+  collect m = C $ \k -> fst `liftM`
+                             mfix (\ ~(_,w) -> collect (unC m (\a -> k (a,w))))
 
 
 -- $WriterM_ExceptionT
@@ -757,20 +762,22 @@ instance (Monad m) => RunExceptionM (ExceptionT i m) i where
   try m = lift (runExceptionT m)
 
 instance (RunExceptionM m i) => RunExceptionM (IdT m) i where
-  try (IT m) = IT (try m)
+  try m = IT $ try $ runIdT m
 
 instance (RunExceptionM m i) => RunExceptionM (ReaderT j m) i where
-  try (R m) = R (try . m)
+  try m = R $ \r -> try $ runReaderT r m
 
 instance (RunExceptionM m i,Monoid j) => RunExceptionM (WriterT j m) i where
-  try (W m) = W (liftM swap (try m))
-    where swap (Right (P a w))  = P (Right a) w
-          swap (Left e)         = P (Left e) mempty
+  try m = W $ do res <- try $ unW m
+                 pure $ case res of
+                          Right (P a w) -> P (Right a) w
+                          Left e        -> P (Left e)  mempty
 
 instance (RunExceptionM m i) => RunExceptionM (StateT j m) i where
-  try (S m) = S (\s -> liftM (swap s) (try (m s)))
-    where swap _ (Right ~(a,s)) = (Right a,s)
-          swap s (Left e)       = (Left e, s)
+  try m = S $ \s -> do res <- try $ runStateT s m
+                       pure $ case res of
+                                Right ~(a,s1) -> (Right a, s1)
+                                Left e        -> (Left e,  s)
 
 instance RunExceptionM m i => RunExceptionM (ChoiceT m) i where
   try m = N $ \k -> do mb <- try (runChoiceT m)
