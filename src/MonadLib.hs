@@ -98,15 +98,39 @@ data P a i = P a !i
 newtype StateT     i m a  = S (i -> m (a,i))
 
 -- | Add support for exceptions of type @i@.
-newtype ExceptionT i m a  = X { unX :: forall r. (i -> m r) ->
-                                                 (a -> m r) -> m r }
+newtype ExceptionT i m a  = X { unX :: forall r. (a -> ExT i m r) -> ExT i m r }
+
+type ExT i m r = m (Either i r)
+
+exPack :: Monad m => ExT i m r -> ExceptionT i m r
+exPack x = X $ \k -> do mb <- x
+                        case mb of
+                          Left r  -> exRaise r
+                          Right a -> k a
+
+exRaise :: Monad m => i -> ExT i m r
+exRaise = pure . Left
 
 -- | Add support for multiple answers.
-data ChoiceT m a          = N { unN :: forall r. m r ->
-                                                 (m r -> m r -> m r) ->
-                                                 (a -> m r) ->
-                                                 m r }
+data ChoiceT m a          = N { unN :: forall r.  (a -> ChT m r) -> ChT m r }
 
+type ChT m r = m (Maybe (r, ChoiceT m r))
+
+chZero :: Monad m => ChT m r
+chZero = pure Nothing
+
+chPlus :: Monad m => ChT m r -> ChT m r -> ChT m r
+chPlus x y =
+  do mb <- x
+     case mb of
+       Nothing -> y
+       Just (a,more) -> pure (Just (a, more `mplus` chPack y))
+
+chPack :: Monad m => ChT m r -> ChoiceT m r
+chPack x = N $ \k -> do mb <- x
+                        case mb of
+                          Nothing    -> chZero
+                          Just (a,r) -> chPlus (k a) (unN r k)
 
 
 
@@ -156,7 +180,7 @@ runStateT i (S m) = m i
 -- Successful results are tagged with 'Right',
 -- exceptional results are tagged with 'Left'.
 runExceptionT :: Monad m => ExceptionT i m a -> m (Either i a)
-runExceptionT (X m) = m (pure . Left) (pure . Right)
+runExceptionT (X m) = m (pure . Right)
 
 -- | Execute a computation that may return multiple answers.
 -- The resulting computation returns 'Nothing'
@@ -166,22 +190,7 @@ runExceptionT (X m) = m (pure . Left) (pure . Right)
 -- The search is depth-first and left-biased with respect to the
 -- 'mplus' operation.
 runChoiceT :: (Monad m) => ChoiceT m a -> m (Maybe (a, ChoiceT m a))
-runChoiceT m = unN m none choice one
-  where
-  none       = pure Nothing
-  choice x y = do mb <- x
-                  case mb of
-                    Nothing -> y
-                    Just (a,more) -> pure (Just (a, more `mplus` packChoiceT y))
-
-  one a  = pure (Just (a, mzero))
-
-
-packChoiceT :: Monad m => m (Maybe (a, ChoiceT m a)) -> ChoiceT m a
-packChoiceT x = N $ \z jn c -> do mb <- x
-                                  case mb of
-                                    Nothing -> z
-                                    Just (a,r) -> jn (c a) (unN r z jn c)
+runChoiceT m = unN m $ \a -> pure (Just (a,mzero))
 
 
 
@@ -261,9 +270,9 @@ instance MonadT (ReaderT    i) where lift m = R (\_ -> m)
 instance MonadT (StateT     i) where lift m = S (\s -> liftM (\a -> (a,s)) m)
 instance (Monoid i)
       => MonadT (WriterT i)    where lift m = W (liftM (\a -> P a mempty) m)
-instance MonadT (ExceptionT i) where lift m = X (\_ k   -> m >>= k)
-instance MonadT ChoiceT        where lift m = N (\_ _ r -> m >>= r)
-instance MonadT (ContT      i) where lift m = C (\k     -> m >>= k)
+instance MonadT (ExceptionT i) where lift m = X (\k -> m >>= k)
+instance MonadT ChoiceT        where lift m = N (\k -> m >>= k)
+instance MonadT (ContT      i) where lift m = C (\k -> m >>= k)
 
 
 -- Definitions for some of the methods that are the same for all transformers
@@ -365,12 +374,12 @@ instance (Monad m,Monoid i) => Monad (WriterT i m) where
 instance (Monad m) => Monad (ExceptionT i m) where
   return  = t_return
   fail    = t_fail
-  m >>= k = X $ \r ok -> unX m r $ \a -> unX (k a) r ok
+  m >>= k = X $ \ok -> unX m $ \a -> unX (k a) ok
 
 instance Monad m => Monad (ChoiceT m) where
   return   = t_return
   fail     = t_fail
-  m >>= f  = N (\z j r -> unN m z j (\a -> unN (f a) z j r))
+  m >>= f  = N (\r -> unN m $ \a -> unN (f a) r)
 
 instance (Monad m) => Monad (ContT i m) where
   return  = t_return
@@ -448,15 +457,15 @@ instance (MonadFix m,Monoid i) => MonadFix (WriterT i m) where
   mfix f  = W $ mfix (unW . f . val)
     where val ~(P a _) = a
 
--- No instance for ChoiceT
+-- No instance for ChoiceT.  Well, here is one.  What does it do?
+instance (MonadFix m) => MonadFix (ChoiceT m) where
+  mfix f  = chPack $ mfix (runChoiceT . f . fromOne)
+    where fromOne (Just (a,_)) = a -- XXX: do we need to check that there
+                                   -- are no other options?
+          fromOne _            = error "ExceptionT: mfix looped."
 
 instance (MonadFix m) => MonadFix (ExceptionT i m) where
-  mfix f  = X $ \r ok -> do res <- mfix (runExceptionT . f . fromRight)
-                            case res of
-                              Left x  -> r x
-                              Right a -> ok a
-
-  -- mfix f  = X $ mfix (runExceptionT . f . fromRight)
+  mfix f  = exPack $ mfix (runExceptionT . f . fromRight)
     where fromRight (Right a) = a
           fromRight _         = error "ExceptionT: mfix looped."
 
@@ -480,11 +489,11 @@ instance (MonadPlus m,Monoid i) => MonadPlus (WriterT i m) where
 
 instance (MonadPlus m) => MonadPlus (ExceptionT i m) where
   mzero             = t_mzero
-  mplus m n         = X $ \r ok -> mplus (unX m r ok) (unX n r ok)
+  mplus m n         = X $ \ok -> mplus (unX m ok) (unX n ok)
 
 instance (Monad m) => MonadPlus (ChoiceT m) where
-  mzero             = N $ \z _ _ -> z
-  mplus m n         = N $ \z jn r -> jn (unN m z jn r) (unN n z jn r)
+  mzero             = N $ \_ -> chZero
+  mplus m n         = N $ \k -> chPlus (unN m k) (unN n k)
 
 -- Alternatives share the continuation.
 instance (MonadPlus m) => MonadPlus (ContT i m) where
@@ -563,7 +572,7 @@ instance ExceptionM IO IO.SomeException where
   raise = IO.throwIO
 
 instance (Monad m) => ExceptionM (ExceptionT i m) i where
-  raise x = X $ \r _ -> r x
+  raise x = X $ \_ -> exRaise x
 
 instance (ExceptionM m j) => ExceptionM (IdT m) j where
   raise = t_raise
@@ -610,19 +619,10 @@ instance (ContM m,Monoid i) => ContM (WriterT i m) where
   callWithCC f = W $ callWithCC $ \k -> unW $ liftJump (`P` mempty) f k
 
 instance (ContM m) => ContM (ExceptionT i m) where
-  callWithCC f = X $ \r ok ->
-     do res <- callWithCC $ \k -> runExceptionT $ liftJump Right f k
-        case res of
-          Left x -> r x
-          Right a -> ok a
-
+  callWithCC f = exPack $ callWithCC $ \k -> runExceptionT $ liftJump Right f k
 
 instance (ContM m) => ContM (ChoiceT m) where
-  callWithCC f = N $ \z jn r -> do mb <- callWithCC $ \k ->
-                                                  runChoiceT (liftJump one f k)
-                                   case mb of
-                                     Nothing -> z
-                                     Just (a,m') -> jn (r a) (unN m' z jn r)
+  callWithCC f = chPack $ callWithCC $ \k -> runChoiceT (liftJump one f k)
     where one a = Just (a, mzero)
     -- ??? What does this do ???
 
@@ -655,10 +655,11 @@ instance (RunReaderM m j,Monoid i) => RunReaderM (WriterT i m) j where
 instance (RunReaderM m j) => RunReaderM (StateT     i m) j where
   local i (S m) = S (local i . m)
 instance (RunReaderM m j) => RunReaderM (ExceptionT i m) j where
-  local i m = X $ \r ok -> do res <- local i (runExceptionT m)
-                              case res of
-                                Left x -> r x
-                                Right a -> ok a
+  local i m = exPack $ local i (runExceptionT m)
+
+-- what does this do?
+instance (RunReaderM m j) => RunReaderM (ChoiceT m) j where
+  local i m = chPack $ local i (runChoiceT m)
 
 instance (RunReaderM m j) => RunReaderM (ContT i m) j where
   local i (C m) = C (local i . m)
@@ -679,11 +680,18 @@ instance (RunWriterM m j) => RunWriterM (ReaderT i m) j where
 instance (RunWriterM m j) => RunWriterM (StateT i m) j where
   collect (S m) = S (liftM swap . collect . m)
     where swap (~(a,s),w) = ((a,w),s)
+
+-- pack dosn't quite work here, as we have to eal with the output
 instance (RunWriterM m j) => RunWriterM (ExceptionT i m) j where
-  collect m = X $ \r ok -> do (res,w) <- collect (runExceptionT m)
-                              case res of
-                                Right a -> ok (a,w)
-                                Left x  -> r x
+  collect m = X $ \ok -> do (res,w) <- collect (runExceptionT m)
+                            case res of
+                              Right a -> ok (a,w)
+                              Left x  -> exRaise x
+
+-- What could an instance for ChoiceT do?
+-- it has options: either collcet up to the first answer, or collect
+-- output of all branches, but then we'd have to actually execute all
+-- options...
 
 instance (RunWriterM m j, MonadFix m) => RunWriterM (ContT i m) j where
   collect (C m) = C $ \k -> fst `liftM`
