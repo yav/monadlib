@@ -658,9 +658,12 @@ instance (RunReaderM m j) => RunReaderM (StateT     i m) j where
 instance (RunReaderM m j) => RunReaderM (ExceptionT i m) j where
   local i m = exPack $ local i $ runExceptionT m
 
--- what does this do?
 instance (RunReaderM m j) => RunReaderM (ChoiceT m) j where
-  local i m = chPack $ local i (runChoiceT m)
+  local i m = N $ \k -> do mb <- local i (runChoiceT m)
+                           case mb of
+                             Nothing    -> chZero
+                             Just (a,n) -> chPlus (k a) (unN (local i n) k)
+
 
 instance (RunReaderM m j) => RunReaderM (ContT i m) j where
   local i (C m) = C (local i . m)
