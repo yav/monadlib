@@ -685,17 +685,22 @@ instance (RunWriterM m j) => RunWriterM (StateT i m) j where
   collect (S m) = S (liftM swap . collect . m)
     where swap (~(a,s),w) = ((a,w),s)
 
--- pack dosn't quite work here, as we have to deal with the output
-instance (RunWriterM m j) => RunWriterM (ExceptionT i m) j where
-  collect m = X $ \ok -> do (res,w) <- collect (runExceptionT m)
-                            case res of
-                              Right a -> ok (a,w)
-                              Left x  -> exRaise x
+{- | If an exception is risen while we are collecting output,
+then the output is lost.  If the output is important,
+then use 'try' to ensure that no exception may occur.
+Example:
 
--- What could an instance for ChoiceT do?
--- it has options: either collcet up to the first answer, or collect
--- output of all branches, but then we'd have to actually execute all
--- options...
+> do (r,w) <- collect (try m)
+>    case r of
+>      Left err -> ...do something...
+>      Right a  -> ...do something...
+-}
+instance (RunWriterM m j) => RunWriterM (ExceptionT i m) j where
+  collect m = X $ \k -> do (res,w) <- collect (runExceptionT m)
+                           case res of
+                             Right a -> k (a,w)
+                             Left x  -> exRaise x
+
 
 instance (RunWriterM m j, MonadFix m) => RunWriterM (ContT i m) j where
   collect (C m) = C $ \k -> fst `liftM`
