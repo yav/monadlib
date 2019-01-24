@@ -644,8 +644,7 @@ instance (Monad m) => ContM (ContT i m) where
 -- sub-computation.
 class (ReaderM m i) => RunReaderM m i | m -> i where
   -- | Change the context for the duration of a sub-computation.
-  local        :: i -> m a -> m a
-  -- prop(?): local i (m1 >> m2) = local i m1 >> local i m2
+  local :: i -> m a -> m a
 
 instance (Monad m)        => RunReaderM (ReaderT    i m) i where
   local i m     = lift (runReaderT i m)
