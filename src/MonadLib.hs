@@ -97,8 +97,10 @@ data P a i = P a !i
 -- | Add support for threading state of type @i@.
 newtype StateT     i m a  = S (i -> m (a,i))
 
+type WithCont r a = (a -> r) -> r
+
 -- | Add support for exceptions of type @i@.
-newtype ExceptionT i m a  = X { unX :: forall r. (a -> ExT i m r) -> ExT i m r }
+newtype ExceptionT i m a  = X { unX :: forall r. WithCont (ExT i m r) a }
 
 type ExT i m r = m (Either i r)
 
@@ -112,7 +114,7 @@ exRaise :: Monad m => i -> ExT i m r
 exRaise = pure . Left
 
 -- | Add support for multiple answers.
-data ChoiceT m a          = N { unN :: forall r.  (a -> ChT m r) -> ChT m r }
+data ChoiceT m a          = N { unN :: forall r.  WithCont (ChT m r) a }
 
 type ChT m r = m (Maybe (r, ChoiceT m r))
 
@@ -136,7 +138,7 @@ chPack x = N $ \k -> do mb <- x
 
 
 -- | Add support for continuations within a prompt of type @i@.
-newtype ContT i m a  = C ((a -> m i) -> m i)
+newtype ContT i m a  = C { unC :: WithCont (m i) a }
 
 -- $Execution
 --
@@ -209,7 +211,7 @@ findAll m = all_res =<< runChoiceT m
 
 -- | Execute a computation with the given continuation.
 runContT      :: (a -> m i) -> ContT i m a -> m i
-runContT i (C m) = m i
+runContT i m = unC m i
 
 
 -- | Generalized running.
@@ -309,6 +311,12 @@ t_raise i   = lift (raise i)
 
 t_abort    :: (MonadT t, AbortM m i) => i -> t m a
 t_abort i   = lift (abort i)
+
+-- bind for monads based on continuations
+c_bind     :: (forall a. m a -> WithCont r a) ->
+              m a -> (a -> m b) ->
+              WithCont r b
+c_bind un m f = \k -> un m $ \a -> un (f a) k
 --------------------------------------------------------------------------------
 
 
@@ -374,17 +382,17 @@ instance (Monad m,Monoid i) => Monad (WriterT i m) where
 instance (Monad m) => Monad (ExceptionT i m) where
   return  = t_return
   fail    = t_fail
-  m >>= k = X $ \ok -> unX m $ \a -> unX (k a) ok
+  m >>= f = X (c_bind unX m f)
 
 instance Monad m => Monad (ChoiceT m) where
   return   = t_return
   fail     = t_fail
-  m >>= f  = N (\r -> unN m $ \a -> unN (f a) r)
+  m >>= f  = N (c_bind unN m f)
 
 instance (Monad m) => Monad (ContT i m) where
   return  = t_return
   fail    = t_fail
-  m >>= k = C $ \c -> runContT (\a -> runContT c (k a)) m
+  m >>= f = C (c_bind unC m f)
 
 instance                       Functor Id               where fmap = liftM
 instance                       Functor Lift             where fmap = liftM
@@ -655,7 +663,7 @@ instance (RunReaderM m j,Monoid i) => RunReaderM (WriterT i m) j where
 instance (RunReaderM m j) => RunReaderM (StateT     i m) j where
   local i (S m) = S (local i . m)
 instance (RunReaderM m j) => RunReaderM (ExceptionT i m) j where
-  local i m = exPack $ local i (runExceptionT m)
+  local i m = exPack $ local i $ runExceptionT m
 
 -- what does this do?
 instance (RunReaderM m j) => RunReaderM (ChoiceT m) j where
@@ -681,7 +689,7 @@ instance (RunWriterM m j) => RunWriterM (StateT i m) j where
   collect (S m) = S (liftM swap . collect . m)
     where swap (~(a,s),w) = ((a,w),s)
 
--- pack dosn't quite work here, as we have to eal with the output
+-- pack dosn't quite work here, as we have to deal with the output
 instance (RunWriterM m j) => RunWriterM (ExceptionT i m) j where
   collect m = X $ \ok -> do (res,w) <- collect (runExceptionT m)
                             case res of
