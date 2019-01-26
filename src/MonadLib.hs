@@ -912,7 +912,7 @@ The first entry in the list is the top-most layer of the monad stack
 (i.e., the one that is furtherest from the base).  For example:
 
 > newtype M a = M { unM ::
->   /ithBase IO
+>   WithBase IO
 >     '[ ReaderT    Int
 >      , StateT     Char
 >      , ExceptionT String
