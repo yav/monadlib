@@ -32,6 +32,7 @@ import MonadLib
 import Control.Applicative
 import Control.Monad.Fix
 import Prelude hiding (Ordering(..))
+import Control.Monad.Fail as MF
 
 -- | An isomorphism between (usually) monads.
 -- Typically the constructor and selector of a newtype delcaration.
@@ -66,8 +67,8 @@ derive_return iso a = close iso (return a)
 derive_bind :: (Monad m) => Iso m n -> n a -> (a -> n b) -> n b
 derive_bind iso m k = close iso ((open iso m) >>= \x -> open iso (k x))
 
-derive_fail :: (Monad m) => Iso m n -> String -> n a
-derive_fail iso a = close iso (fail a)
+derive_fail :: (MF.MonadFail m) => Iso m n -> String -> n a
+derive_fail iso a = close iso (MF.fail a)
 
 -- | Derive the implementation of 'mfix' from 'MonadFix'.
 derive_mfix :: (MonadFix m) => Iso m n -> (a -> n a) -> n a

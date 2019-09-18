@@ -49,27 +49,15 @@ module MonadLib (
   module Control.Monad
 ) where
 
-#if __GLASGOW_HASKELL__ < 800
-import Data.Monoid
-#endif
-
 import Control.Applicative
 import Control.Monad
 import Control.Monad.Fix
 import Control.Monad.ST (ST)
-import qualified Control.Exception as IO (throwIO,try)
-#ifdef USE_BASE3
-import qualified Control.Exception as IO (Exception)
-#else
-import qualified Control.Exception as IO (SomeException)
-#endif
+import qualified Control.Exception as IO (throwIO,try,SomeException)
 import System.Exit(ExitCode,exitWith)
 import Data.Kind(Type)
 import Prelude hiding (Ordering(..))
-#if __GLASGOW_HASKELL__ >= 800
 import qualified Control.Monad.Fail as MF
-import Control.Monad.Fail(MonadFail)
-#endif
 
 
 -- $Types
@@ -261,11 +249,13 @@ t_inBase m  = lift (inBase m)
 t_return   :: (MonadT t, Monad m) => a -> t m a
 t_return x  = lift (return x)
 
-t_fail     :: (MonadT t, Monad m) => String -> t m a
-t_fail x    = lift (fail x)
+t_fail     :: (MonadT t, MF.MonadFail m) => String -> t m a
+t_fail x    = lift (MF.fail x)
 
-t_fail'    :: (MonadT t, MonadFail m) => String -> t m a
-t_fail' x   = lift (MF.fail x)
+#if !MIN_VERSION_base(4,11,0)
+t_oldfail  :: (MonadT t, Monad m) => String -> t m a
+t_oldfail x = lift (fail x)
+#endif
 
 t_mzero    :: (MonadT t, MonadPlus m) => t m a
 t_mzero     = lift mzero
@@ -313,63 +303,81 @@ instance (BaseM m n) => BaseM (ContT      i m) n where inBase = t_inBase
 
 
 instance Monad Id where
-  return x = I x
-  fail x   = error x
   m >>= k  = k (runId m)
 
+#if !MIN_VERSION_base(4,11,0)
+  fail = error
+#endif
+
 instance Monad Lift where
-  return x  = L x
-  fail x    = error x
   L x >>= k = k x     -- Note: the pattern is important here
                       -- because it makes things strict
+
+#if !MIN_VERSION_base(4,11,0)
+  fail = error
+#endif
 
 
 -- Note: None of the transformers make essential use of the 'fail' method.
 -- Instead, they delegate its behavior to the underlying monad.
 
 instance (Monad m) => Monad (IdT m) where
-  return  = t_return
-  fail    = t_fail
   m >>= k = IT (runIdT m >>= (runIdT . k))
 
+#if !MIN_VERSION_base(4,11,0)
+  fail = t_oldfail
+#endif
+
 instance (Monad m) => Monad (ReaderT i m) where
-  return  = t_return
-  fail    = t_fail
   m >>= k = R (\r -> runReaderT r m >>= \a -> runReaderT r (k a))
 
+#if !MIN_VERSION_base(4,11,0)
+  fail = t_oldfail
+#endif
+
 instance (Monad m) => Monad (StateT i m) where
-  return  = t_return
-  fail    = t_fail
   m >>= k = S (\s -> runStateT s m >>= \ ~(a,s') -> runStateT s' (k a))
 
+#if !MIN_VERSION_base(4,11,0)
+  fail = t_oldfail
+#endif
+
 instance (Monad m,Monoid i) => Monad (WriterT i m) where
-  return  = t_return
-  fail    = t_fail
   m >>= k = W $ unW m     >>= \ ~(P a w1) ->
                 unW (k a) >>= \ ~(P b w2) ->
                 return (P b (mappend w1 w2))
 
+#if !MIN_VERSION_base(4,11,0)
+  fail = t_oldfail
+#endif
+
 instance (Monad m) => Monad (ExceptionT i m) where
-  return  = t_return
-  fail    = t_fail
   m >>= k = X $ runExceptionT m >>= \e ->
                 case e of
                   Left x  -> return (Left x)
                   Right a -> runExceptionT (k a)
 
+#if !MIN_VERSION_base(4,11,0)
+  fail = t_oldfail
+#endif
+
 instance (Monad m) => Monad (ChoiceT m) where
-  return x  = Answer x
-  fail x    = lift (fail x)
 
   Answer a  >>= k     = k a
   NoAnswer >>= _      = NoAnswer
   Choice m1 m2 >>= k  = Choice (m1 >>= k) (m2 >>= k)
   ChoiceEff m >>= k   = ChoiceEff (liftM (>>= k) m)
 
+#if !MIN_VERSION_base(4,11,0)
+  fail = t_oldfail
+#endif
+
 instance (Monad m) => Monad (ContT i m) where
-  return  = t_return
-  fail    = t_fail
   m >>= k = C $ \c -> runContT (\a -> runContT c (k a)) m
+
+#if !MIN_VERSION_base(4,11,0)
+  fail = t_oldfail
+#endif
 
 instance                       Functor Id               where fmap = liftM
 instance                       Functor Lift             where fmap = liftM
@@ -386,17 +394,17 @@ instance (Monad m)          => Functor (ContT      i m) where fmap = liftM
 -- NOTE: It may be possible to make these more general
 -- (i.e., have Applicative, or even Functor transformers)
 
-instance              Applicative Id            where (<*>) = ap; pure = return
-instance              Applicative Lift          where (<*>) = ap; pure = return
-instance (Monad m) => Applicative (IdT m)       where (<*>) = ap; pure = return
-instance (Monad m) => Applicative (ReaderT i m) where (<*>) = ap; pure = return
-instance (Monad m) => Applicative (StateT i m)  where (<*>) = ap; pure = return
+instance              Applicative Id            where (<*>) = ap; pure x = I x
+instance              Applicative Lift          where (<*>) = ap; pure x = L x
+instance (Monad m) => Applicative (IdT m)       where (<*>) = ap; pure = t_return
+instance (Monad m) => Applicative (ReaderT i m) where (<*>) = ap; pure = t_return
+instance (Monad m) => Applicative (StateT i m)  where (<*>) = ap; pure = t_return
 instance (Monad m,Monoid i)
-                   => Applicative (WriterT i m) where (<*>) = ap; pure = return
+                   => Applicative (WriterT i m) where (<*>) = ap; pure = t_return
 instance (Monad m) => Applicative (ExceptionT i m)
-                                                where (<*>) = ap; pure = return
-instance (Monad m) => Applicative (ChoiceT m)   where (<*>) = ap; pure = return
-instance (Monad m) => Applicative (ContT i m)   where (<*>) = ap; pure = return
+                                                where (<*>) = ap; pure = t_return
+instance (Monad m) => Applicative (ChoiceT m)   where (<*>) = ap; pure = Answer
+instance (Monad m) => Applicative (ContT i m)   where (<*>) = ap; pure = t_return
 
 instance (MonadPlus m)
            => Alternative (IdT m)           where (<|>) = mplus; empty = mzero
@@ -689,13 +697,8 @@ class ExceptionM m i => RunExceptionM m i | m -> i where
   -- successful computations are tagged with "Right".
   try :: m a -> m (Either i a)
 
-#ifdef USE_BASE3
-instance RunExceptionM IO IO.Exception where
-  try = IO.try
-#else
 instance RunExceptionM IO IO.SomeException where
   try = IO.try
-#endif
 
 instance (Monad m) => RunExceptionM (ExceptionT i m) i where
   try m = lift (runExceptionT m)
@@ -857,13 +860,11 @@ type family WithBase base layers :: Type -> Type where
   WithBase b (f ': fs)  = f (WithBase b fs)
 
 
-#if __GLASGOW_HASKELL__ >= 800
-instance MonadFail m => MonadFail (IdT          m) where fail = t_fail'
-instance MonadFail m => MonadFail (ReaderT    i m) where fail = t_fail'
-instance (Monoid i, MonadFail m)
-                     => MonadFail (WriterT    i m) where fail = t_fail'
-instance MonadFail m => MonadFail (StateT     i m) where fail = t_fail'
-instance MonadFail m => MonadFail (ExceptionT i m) where fail = t_fail'
-instance MonadFail m => MonadFail (ChoiceT      m) where fail = t_fail'
-instance MonadFail m => MonadFail (ContT      i m) where fail = t_fail'
-#endif
+instance MF.MonadFail m => MF.MonadFail (IdT          m) where fail = t_fail
+instance MF.MonadFail m => MF.MonadFail (ReaderT    i m) where fail = t_fail
+instance (Monoid i, MF.MonadFail m)
+                        => MF.MonadFail (WriterT    i m) where fail = t_fail
+instance MF.MonadFail m => MF.MonadFail (StateT     i m) where fail = t_fail
+instance MF.MonadFail m => MF.MonadFail (ExceptionT i m) where fail = t_fail
+instance MF.MonadFail m => MF.MonadFail (ChoiceT      m) where fail = t_fail
+instance MF.MonadFail m => MF.MonadFail (ContT      i m) where fail = t_fail

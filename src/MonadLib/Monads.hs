@@ -17,10 +17,6 @@ module MonadLib.Monads (
 import MonadLib
 import MonadLib.Derive
 import Control.Monad.Fix
-#if __GLASGOW_HASKELL__ < 800
-import Data.Monoid
-import Control.Applicative
-#endif
 
 newtype Reader    i a = R' { unR :: ReaderT    i Id a }
 newtype Writer    i a = W' { unW :: WriterT    i Id a }
@@ -47,29 +43,40 @@ instance               BaseM (Exception i) (Exception i) where inBase = id
 instance               BaseM (Cont      i) (Cont      i) where inBase = id
 
 instance Monad (Reader i) where
-  return  = derive_return iso_R
-  fail    = derive_fail iso_R
   (>>=)   = derive_bind iso_R
 
+#if !MIN_VERSION_base(4,11,0)
+  fail = error
+#endif
+
 instance (Monoid i) => Monad (Writer i) where
-  return  = derive_return iso_W
-  fail    = derive_fail iso_W
   (>>=)   = derive_bind iso_W
 
+#if !MIN_VERSION_base(4,11,0)
+  fail = error
+#endif
+
 instance Monad (State i) where
-  return  = derive_return iso_S
-  fail    = derive_fail iso_S
   (>>=)   = derive_bind iso_S
 
+#if !MIN_VERSION_base(4,11,0)
+  fail = error
+#endif
+
+
 instance Monad (Exception i) where
-  return  = derive_return iso_X
-  fail    = derive_fail iso_X
   (>>=)   = derive_bind iso_X
 
+#if !MIN_VERSION_base(4,11,0)
+  fail = error
+#endif
+
 instance Monad (Cont i) where
-  return  = derive_return iso_C
-  fail    = derive_fail iso_C
   (>>=)   = derive_bind iso_C
+
+#if !MIN_VERSION_base(4,11,0)
+  fail = error
+#endif
 
 instance               Functor (Reader    i) where fmap = derive_fmap iso_R
 instance (Monoid i) => Functor (Writer    i) where fmap = derive_fmap iso_W
@@ -77,11 +84,25 @@ instance               Functor (State     i) where fmap = derive_fmap iso_S
 instance               Functor (Exception i) where fmap = derive_fmap iso_X
 instance               Functor (Cont      i) where fmap = derive_fmap iso_C
 
-instance               Applicative (Reader    i) where pure = return; (<*>) = ap
-instance (Monoid i) => Applicative (Writer    i) where pure = return; (<*>) = ap
-instance               Applicative (State     i) where pure = return; (<*>) = ap
-instance               Applicative (Exception i) where pure = return; (<*>) = ap
-instance               Applicative (Cont      i) where pure = return; (<*>) = ap
+instance Applicative (Reader i) where
+  pure = derive_return iso_R
+  (<*>) = ap
+
+instance (Monoid i) => Applicative (Writer i) where
+  pure = derive_return iso_W
+  (<*>) = ap
+
+instance Applicative (State i) where
+  pure = derive_return iso_S
+  (<*>) = ap
+
+instance Applicative (Exception i) where
+  pure = derive_return iso_X
+  (<*>) = ap
+
+instance Applicative (Cont i) where
+  pure = derive_return iso_C
+  (<*>) = ap
 
 instance               MonadFix (Reader    i) where mfix = derive_mfix iso_R
 instance (Monoid i) => MonadFix (Writer    i) where mfix = derive_mfix iso_W
