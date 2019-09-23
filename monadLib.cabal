@@ -22,7 +22,7 @@ Library
     MonadLib.Monads,
     MonadLib.Derive
 
-  Build-depends: base >= 4 && < 5
+  Build-depends: base >= 4.9 && < 5
 
   GHC-options:    -O2 -Wall
 
