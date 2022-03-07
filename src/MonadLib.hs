@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP, MultiParamTypeClasses, FunctionalDependencies,
-             UndecidableInstances, FlexibleInstances #-}
+             UndecidableInstances, FlexibleInstances, FlexibleContexts #-}
 {-# LANGUAGE DataKinds, TypeFamilies, TypeOperators #-}
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE ScopedTypeVariables #-}
