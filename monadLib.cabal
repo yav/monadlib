@@ -5,7 +5,7 @@ License:        ISC
 License-file:   LICENSE
 Author:         Iavor S. Diatchki
 Maintainer:     diatchki@galois.com
-Homepage:       http://wiki.github.com/yav/monadlib
+Homepage:       https://github.com/yav/monadlib
 Category:       Monads
 Synopsis:       A collection of monad transformers.
 Description:    A collection of monad transformers.
